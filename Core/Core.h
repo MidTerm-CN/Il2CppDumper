@@ -1,6 +1,33 @@
 #pragma once
+#include <regex>
 
 #define ApiManager Il2CppResolver->il2CppManager
+
+const std::unordered_map<std::string, std::string> csTypeMap
+{
+	{ "System::Collections::Generic::Dictionary",	"Dictionary" },
+	{ "System::Boolean",	"bool" },
+	{ "System::Byte",		"uint8_t" },
+	{ "System::SByte",		"int8_t" },
+	{ "System::Char",		"uint16_t" },
+	{ "System::Int16",		"int16_t" },
+	{ "System::UInt16",		"uint16_t" },
+	{ "System::Int32",		"int32_t" },
+	{ "System::UInt32",		"uint32_t" },
+	{ "System::Int64",		"int64_t" },
+	{ "System::UInt64",		"uint64_t" },
+	{ "System::Single",		"float" },
+	{ "System::Double",		"double" },
+	{ "System::String",		"Il2CppString" },
+	{ "System::Object",		"Il2CppObject" },
+	{ "System::Void",		"void" },
+};
+
+const std::unordered_map<std::string, std::string> csOperatorMap
+{
+	{ "decrement",		"--" },
+	{ "increment",		"++" },
+};
 
 struct PreAnalysisKlass
 {
@@ -11,14 +38,35 @@ struct PreAnalysisKlass
 
 inline const std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-
+	{ "UnityEngine.CoreModule", "UnityEngine", "Application" },
+	{ "UnityEngine.CoreModule", "UnityEngine", "GameObject" },
 };
 
 struct FieldStructure
 {
 	std::string name;
 	std::string type;
+	std::string value;
 	std::string offset;
+
+	bool enumField;
+	bool genericField;
+	bool valueField;
+	bool backingField;
+	bool arrayField;
+
+	struct FieldElementStructure
+	{
+		std::string type;
+		bool enumField;
+		bool genericField;
+		bool valueField;
+		bool backingField;
+		bool arrayField;
+		bool initialized;
+	};
+
+	std::vector<FieldElementStructure> elements;
 };
 
 struct MethodPrameterStructure
@@ -34,11 +82,14 @@ struct MethodStructure
 	std::string signature;
 	std::vector<MethodPrameterStructure> parameters;
 	std::string returnType;
+
+	bool operatorMethod = false;
 };
 
 struct KlassStructure
 {
 	PreAnalysisKlass klass;
+	std::string fullName;
 	std::string name;
 	std::vector<std::string> inheritance;
 	std::string flags;
@@ -48,6 +99,11 @@ struct KlassStructure
 	std::vector<MethodStructure> methods;
 	std::vector<MethodStructure> staticMethods;
 	std::vector<KlassStructure> nestedKlasses;
+
+	bool enumKlass = false;
+	bool genericKlass = false;
+	bool valueKlass = false;
+	bool coroutineKlass = false;
 };
 
 inline std::string GetKlassFullName(Il2CppClass* klass)
@@ -56,14 +112,39 @@ inline std::string GetKlassFullName(Il2CppClass* klass)
 	std::string name = ApiManager.GetClassName(klass);
 	if (nameSpace.empty())
 		return name;
+	while (nameSpace.find(".") != std::string::npos) nameSpace.replace(nameSpace.find("."), 1, "::");
 	return nameSpace + "::" + name;
 }
 
 inline std::string GetTypeFullName(const Il2CppType* type)
 {
 	std::string name = ApiManager.GetTypeName(type);
-	for (auto c : name)  if (c == '.') name.replace(name.find(c), 1, "::");
+	while (name.find(".") != std::string::npos) name.replace(name.find("."), 1, "::");
 	return name;
+}
+
+inline bool ClassIsCoroutine(const std::string& name)
+{
+	std::regex regex("(<.*>d__\\d+)");
+	return std::regex_match(name, regex);
+}
+
+inline bool IsBackingField(const std::string& name)
+{
+	std::regex regex("<(.*)>k__BackingField");
+	return std::regex_match(name, regex);
+}
+
+inline void BackingFieldNameRationalization(std::string& name)
+{
+	std::regex regex("<(.*)>k__BackingField");
+	name = std::regex_replace(name, regex, "backingField__$1");
+}
+
+inline bool TypeIsArray(const std::string& name)
+{
+	std::regex regex("(.*)\\[\\]");
+	return std::regex_match(name, regex);
 }
 
 inline std::vector<std::string> GetKlassInheritance(Il2CppClass* klass)
@@ -124,12 +205,12 @@ inline std::string GetMethodFlag(int flagIndex)
 		flags.pop_back();
 	return flags;
 }
- 
+
 inline std::string GetKlassParent(Il2CppClass* klass)
 {
 	if (klass = ApiManager.GetClassParent(klass), klass == nullptr)
 		return std::string();
-	return ApiManager.GetClassNamespace(klass) + std::string("::") + ApiManager.GetClassName(klass);
+	return GetKlassFullName(klass);
 }
 
 inline FieldStructure AnalysisField(FieldInfo* field)
@@ -139,6 +220,33 @@ inline FieldStructure AnalysisField(FieldInfo* field)
 	const Il2CppType* type = ApiManager.GetFieldType(field);
 	fieldStructure.type = GetTypeFullName(type);
 	fieldStructure.offset = std::to_string(ApiManager.GetFieldOffset(field));
+	Il2CppClass* klass = ApiManager.GetClassFromType(type);
+	fieldStructure.enumField = ApiManager.ClassIsEnum(klass);
+	fieldStructure.valueField = ApiManager.ClassIsValueType(klass);
+	fieldStructure.genericField = ApiManager.ClassIsGeneric(klass);
+	fieldStructure.backingField = IsBackingField(fieldStructure.name);
+	if (fieldStructure.backingField)
+		BackingFieldNameRationalization(fieldStructure.name);
+	fieldStructure.arrayField = TypeIsArray(fieldStructure.type);
+	bool array = fieldStructure.arrayField;
+	if (array)
+	{
+		Il2CppClass* elementKlass = ApiManager.GetClassElementClass(klass);
+		while (elementKlass && array)
+		{
+			FieldStructure::FieldElementStructure element = FieldStructure::FieldElementStructure();
+			element.type = GetKlassFullName(elementKlass);
+			element.enumField = ApiManager.ClassIsEnum(elementKlass);
+			element.valueField = ApiManager.ClassIsValueType(elementKlass);
+			element.genericField = ApiManager.ClassIsGeneric(elementKlass);
+			element.arrayField = TypeIsArray(element.type);
+			element.initialized = true;
+			fieldStructure.elements.push_back(element);
+			array = element.arrayField;
+
+			Il2CppClass* elementKlass = ApiManager.GetClassElementClass(klass);
+		}
+	}
 	return fieldStructure;
 }
 
@@ -189,20 +297,39 @@ inline KlassStructure AnalysisKlass(Il2CppClass* klass)
 		logger.LogError("AnalysisKlass: klass is nullptr");
 		return klassStructure;
 	}
+	klassStructure.fullName = GetKlassFullName(klass);
 	klassStructure.name = ApiManager.GetClassName(klass);
+	if (ClassIsCoroutine(klassStructure.name))
+	{
+		klassStructure.coroutineKlass = true;
+		return klassStructure;
+	}
+	klassStructure.klass.name = klassStructure.name;
 	klassStructure.klass.name = klassStructure.name;
 	klassStructure.klass.nameSpace = ApiManager.GetClassNamespace(klass);
 	klassStructure.klass.assemblyName = GetKlassAssemble(klass);
 	klassStructure.inheritance = GetKlassInheritance(klass);
 	klassStructure.flags = GetKlassFlag(ApiManager.GetClassFlags(klass));
 	klassStructure.baseKlass = GetKlassParent(klass);
-	
+	klassStructure.enumKlass = ApiManager.ClassIsEnum(klass);
+	klassStructure.valueKlass = ApiManager.ClassIsValueType(klass);
+	klassStructure.genericKlass = ApiManager.ClassIsGeneric(klass);
+
 	void* iterator = nullptr;
 	FieldInfo* field = nullptr;
 	while ((field = ApiManager.GetClassFields(klass, &iterator)) != nullptr)
 	{
 		if (ApiManager.GetFieldFlags(field) & 0x0010)
-			klassStructure.staticFields.push_back(AnalysisField(field));
+		{
+			FieldStructure fieldStructure = AnalysisField(field);
+			if (klassStructure.enumKlass)
+			{
+				int value = 0;
+				ApiManager.StaticFieldGetValue(field, &value);
+				fieldStructure.value = std::to_string(value);
+			}
+			klassStructure.staticFields.push_back(fieldStructure);
+		}
 		else
 			klassStructure.fields.push_back(AnalysisField(field));
 	}
@@ -215,11 +342,19 @@ inline KlassStructure AnalysisKlass(Il2CppClass* klass)
 		if (methodName.find(".ctor") != std::string::npos)
 			continue;
 		if (ApiManager.GetMethodFlags(method, NULL) & 0x0010)
-			klassStructure.staticMethods.push_back(AnalysisMethod(method));
+		{
+			MethodStructure methodStructure = AnalysisMethod(method);
+			if (methodName[0] == 'o' && methodName[1] == 'p' && methodName[2] == '_')
+			{
+				methodStructure.name = methodStructure.name.substr(3);
+				methodStructure.operatorMethod = true;
+			}
+			klassStructure.staticMethods.push_back(methodStructure);
+		}
 		else
 			klassStructure.methods.push_back(AnalysisMethod(method));
 	}
-	
+
 	iterator = nullptr;
 	Il2CppClass* nestedKlass = nullptr;
 	while ((nestedKlass = ApiManager.GetClassNestedTypes(klass, &iterator)) != nullptr)
@@ -230,14 +365,47 @@ inline KlassStructure AnalysisKlass(Il2CppClass* klass)
 	return klassStructure;
 }
 
-inline std::string GenerateKlassStructure(KlassStructure klass)
+inline void PretreatmentFieldStructure(FieldStructure& field)
+{
+	if (csTypeMap.find(field.type) != csTypeMap.end())
+		field.type = csTypeMap.at(field.type);
+	if (field.valueField || field.enumField)
+		return;
+	if (field.arrayField)
+	{
+		int arrayCount = field.elements.size();
+		if (csTypeMap.find(field.elements.at(arrayCount - 1).type) != csTypeMap.end())
+			field.elements.at(arrayCount - 1).type = csTypeMap.at(field.elements.at(arrayCount - 1).type);
+		field.type = field.elements.at(arrayCount - 1).type;
+		if (!field.elements.at(arrayCount - 1).valueField && !field.elements.at(arrayCount - 1).enumField)
+			field.type += "*";
+		for (size_t i = 0; i < arrayCount; i++)  field.type = "Array<" + field.type + ">" + (i == arrayCount - 1 ? "" : "*");
+	}
+	field.type += "*";
+}
+
+inline void PretreatmentKlass(KlassStructure& klass)
+{
+	for (auto& item : klass.fields)
+	{
+		PretreatmentFieldStructure(item);
+	}
+	for (auto& item : klass.staticFields)
+	{
+		PretreatmentFieldStructure(item);
+	}
+}
+
+inline std::string GenerateKlassStructure(KlassStructure klass);
+
+inline std::string GenerateClassKlassStructure(KlassStructure klass)
 {
 	std::string result = "";
 	std::string inheritance = "";
 	for (auto& item : klass.inheritance)
 		inheritance += item + (item != klass.inheritance.back() ? std::string(" -> ") : "");
-	
-	result += "// Name: " + klass.name + "\n";
+
+	result += "// Name: " + klass.fullName + "\n";
 	result += "// Flags: " + klass.flags + "\n";
 	result += "// Inheritance: " + inheritance + "\n";
 	result += "class " + klass.name;
@@ -256,7 +424,7 @@ inline std::string GenerateKlassStructure(KlassStructure klass)
 	}
 	result += "public:\n";
 	result += "\tCLASS(\"" + klass.klass.assemblyName + "\", \"" + klass.klass.nameSpace + "\", \"" + klass.klass.name + "\");\n\n";
-	
+
 	if (!klass.staticFields.empty())
 	{
 		for (auto& item : klass.staticFields)
@@ -280,32 +448,106 @@ inline std::string GenerateKlassStructure(KlassStructure klass)
 	{
 		for (auto& item : klass.staticMethods)
 		{
-			result += "\tstatic " + item.returnType + " " + item.name + "(";
-			for (auto& param : item.parameters)
+			result += "\t// Flags: " + item.flags + "\n";
+			if (!item.operatorMethod)
 			{
-				result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+				result += "\tstatic " + item.returnType + " " + item.name + "(";
+				for (auto& param : item.parameters)
+				{
+					result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+				}
+				result += ")\n\t{\n";
+				result += "\t\tMETHOD(" + item.returnType + ", (";
+				for (auto& param : item.parameters)
+				{
+					result += param.type + ", ";
+				}
+				result += "MethodInfo*), \"" + item.signature + "\");\n";
+				result += "\t\treturn function(";
+				for (auto& param : item.parameters)
+				{
+					result += param.name + ", ";
+				}
+				result += "nullptr);\n";
+				result += "\t}\n\n";
 			}
-			result += ")\n\t{\n";
-			result += "\t\tMETHOD(" + item.returnType + ", (";
-			for (auto& param : item.parameters)
+			else
 			{
-				result += param.type + (param.name != item.parameters.back().name ? ", " : "");
+				std::transform(item.name.begin(), item.name.end(), item.name.begin(), ::tolower);
+				if (item.name == "implicit")
+				{
+					if (item.returnType != klass.fullName)
+					{
+						result += "\toperator " + item.returnType + "()\n\t{\n";
+						result += "\t\tMETHOD(" + item.returnType + ", (";
+						for (auto& param : item.parameters)
+						{
+							result += param.type + ", ";
+						}
+						result += "MethodInfo*), \"" + item.signature + "\");\n";
+						result += "\t\treturn function(this, nullptr)\n";
+						result += "\t}\n\n";
+					}
+					else
+					{
+						result += "\t" + klass.name + "(" + item.parameters[0].type + " " + item.parameters[0].name + ")\n\t{\n";
+						result += "\t\tMETHOD(" + klass.fullName + ", (";
+						for (auto& param : item.parameters)
+						{
+							result += param.type + ", ";
+						}
+						result += "MethodInfo*), \"" + item.signature + "\");\n";
+						result += "\t\treturn function(";
+						for (auto& param : item.parameters)
+						{
+							result += param.name + ", ";
+						}
+						result += "nullptr)\n";
+						result += "\t}\n\n";
+					}
+				}
+				else if (csOperatorMap.find(item.name) != csOperatorMap.end())
+				{
+					result += "\t" + item.returnType + " operator " + csOperatorMap.at(item.name) + "()\n\t{\n";
+					result += "\t\tMETHOD(" + klass.fullName + ", (";
+					for (auto& param : item.parameters)
+					{
+						result += param.type + ", ";
+					}
+					result += "MethodInfo*), \"" + item.signature + "\");\n";
+					result += "\t\treturn function(this, nullptr)\n";
+					result += "\t}\n\n";
+				}
+				else
+				{
+					result += "\tstatic " + item.returnType + " op_" + item.name + "(";
+					for (auto& param : item.parameters)
+					{
+						result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+					}
+					result += ")\n\t{\n";
+					result += "\t\tMETHOD(" + item.returnType + ", (";
+					for (auto& param : item.parameters)
+					{
+						result += param.type + ", ";
+					}
+					result += "MethodInfo*), \"" + item.signature + "\");\n";
+					result += "\t\treturn function(";
+					for (auto& param : item.parameters)
+					{
+						result += param.name + ", ";
+					}
+					result += "nullptr);\n";
+					result += "\t}\n\n";
+				}
 			}
-			result += ", MethodInfo*), " + item.signature + ");\n";
-			result += "\t\treturn _fn(";
-			for (auto& param : item.parameters)
-			{
-				result += param.name + (param.name != item.parameters.back().name ? ", " : "");
-			}
-			result += ", nullptr);\n";
-			result += "\t}\n\n";
 		}
-		result += "\n";
 	}
 	if (!klass.methods.empty())
 	{
 		for (auto& item : klass.methods)
 		{
+			result += "\t// Flags: " + item.flags + "\n";
 			result += "\t" + item.returnType + " " + item.name + "(";
 			for (auto& param : item.parameters)
 			{
@@ -318,21 +560,50 @@ inline std::string GenerateKlassStructure(KlassStructure klass)
 				result += param.type + (param.name != item.parameters.back().name ? ", " : "");
 			}
 			result += ", MethodInfo*), \"" + item.signature + "\");\n";
-			result += "\t\treturn _fn(this" + std::string(item.parameters.empty() ? "" : ", ");
+			result += "\t\treturn function(this" + std::string(item.parameters.empty() ? "" : ", ");
 			for (auto& param : item.parameters)
 			{
 				result += param.name + (param.name != item.parameters.back().name ? ", " : "");
 			}
 			result += ", nullptr);\n";
-			result += "\t}\n";
-			if (item.name != klass.methods.back().name)
-				result += "\n";
+			result += "\t}\n\n";
 		}
-		result += "\n";
 	}
-	
+
 	result += "};\n\n";
 	return result;
+}
+
+inline std::string GenerateEnumKlassStructure(KlassStructure klass)
+{
+	std::string result = "";
+
+	result += "// Name: " + klass.fullName + "\n";
+	result += "// Flags: " + klass.flags + "\n";
+	result += "enum class" + klass.name + "\n";
+	result += "{\n";
+	for (auto& item : klass.staticFields)
+	{
+		result += "\t" + item.name + " = " + item.value + ",\n";
+	}
+	result += "};\n";
+
+	return result;
+}
+
+inline std::string GenerateGenericKlassStructure(KlassStructure klass)
+{
+	return GenerateClassKlassStructure(klass);
+}
+
+inline std::string GenerateKlassStructure(KlassStructure klass)
+{
+	if (klass.coroutineKlass)
+		return std::string();
+	else if (klass.enumKlass)
+		return GenerateEnumKlassStructure(klass);
+	PretreatmentKlass(klass);
+	return GenerateGenericKlassStructure(klass);
 }
 
 inline void RunResolver()
@@ -341,7 +612,7 @@ inline void RunResolver()
 	GetModuleFileNameA(NULL, gamePath, MAX_PATH);
 	std::filesystem::path path = std::filesystem::path(gamePath).parent_path() / "dumper";
 	if (!std::filesystem::exists(path)) std::filesystem::create_directory(path);
-	
+
 	logger.LogInfo("NaDUGR is running!");
 	logger.LogInfo("PreAnalysisKlassList size: %d", preAnalysisKlassList.size());
 	for (size_t i = 0; i < preAnalysisKlassList.size(); i++)

@@ -34,48 +34,56 @@ class Il2CppManager
 public:
 	HMODULE assemblyModule;
 	std::unordered_map<std::string, void *> il2cppMethodMap =
-		{
-			{"il2cpp_domain_get", nullptr},
-			{"il2cpp_domain_assembly_open", nullptr},
+	{
+		{"il2cpp_domain_get", nullptr},
+		{"il2cpp_domain_assembly_open", nullptr},
 
-			{"il2cpp_type_get_name", nullptr},
+		{"il2cpp_type_get_name", nullptr},
+		{"il2cpp_type_is_byref", nullptr},
+		{"il2cpp_type_get_attrs", nullptr},
+		{"il2cpp_type_get_class_or_element_class", nullptr},
 
-			{"il2cpp_thread_attach", nullptr},
-			{"il2cpp_thread_detach", nullptr},
+		{"il2cpp_thread_attach", nullptr},
+		{"il2cpp_thread_detach", nullptr},
 
-			{"il2cpp_string_new", nullptr},
-			{"il2cpp_string_chars", nullptr},
-			{"il2cpp_string_length", nullptr},
+		{"il2cpp_string_new", nullptr},
+		{"il2cpp_string_chars", nullptr},
+		{"il2cpp_string_length", nullptr},
 
-			{"il2cpp_gc_disable", nullptr},
+		{"il2cpp_gc_disable", nullptr},
 
-			{"il2cpp_class_get_methods", nullptr},
-			{"il2cpp_class_from_name", nullptr},
-			{"il2cpp_class_get_name", nullptr},
-			{"il2cpp_class_get_namespace", nullptr},
-			{"il2cpp_class_get_image", nullptr},
-			{"il2cpp_class_get_fields", nullptr},
-			{"il2cpp_class_get_parent", nullptr},
-			{"il2cpp_class_get_nested_types", nullptr},
-			{"il2cpp_class_get_flags", nullptr},
+		{"il2cpp_class_get_methods", nullptr},
+		{"il2cpp_class_from_name", nullptr},
+		{"il2cpp_class_get_name", nullptr},
+		{"il2cpp_class_get_namespace", nullptr},
+		{"il2cpp_class_get_image", nullptr},
+		{"il2cpp_class_get_fields", nullptr},
+		{"il2cpp_class_get_parent", nullptr},
+		{"il2cpp_class_get_nested_types", nullptr},
+		{"il2cpp_class_get_flags", nullptr},
+		{"il2cpp_class_is_generic", nullptr},
+		{"il2cpp_class_is_enum", nullptr},
+		{"il2cpp_class_is_valuetype", nullptr},
+		{"il2cpp_class_from_il2cpp_type", nullptr},
+		{"il2cpp_class_get_type", nullptr},
+		{"il2cpp_class_get_element_class", nullptr},
 
-			{"il2cpp_assembly_get_image", nullptr},
+		{"il2cpp_assembly_get_image", nullptr},
 
-			{"il2cpp_method_get_name", nullptr},
-			{"il2cpp_method_get_return_type", nullptr},
-			{"il2cpp_method_get_param_count", nullptr},
-			{"il2cpp_method_get_param", nullptr},
-			{"il2cpp_method_get_flags", nullptr},
-			{"il2cpp_method_get_param_name", nullptr},
+		{"il2cpp_method_get_name", nullptr},
+		{"il2cpp_method_get_return_type", nullptr},
+		{"il2cpp_method_get_param_count", nullptr},
+		{"il2cpp_method_get_param", nullptr},
+		{"il2cpp_method_get_flags", nullptr},
+		{"il2cpp_method_get_param_name", nullptr},
 
-			{"il2cpp_image_get_assembly", nullptr},
+		{"il2cpp_image_get_assembly", nullptr},
 
-			{"il2cpp_field_get_name", nullptr},
-			{"il2cpp_field_get_flags", nullptr},
-			{"il2cpp_field_get_type", nullptr},
-			{"il2cpp_field_get_offset", nullptr},
-
-			{"il2cpp_type_get_class_or_element_class", nullptr},
+		{"il2cpp_field_get_name", nullptr},
+		{"il2cpp_field_get_flags", nullptr},
+		{"il2cpp_field_get_type", nullptr},
+		{"il2cpp_field_get_offset", nullptr},
+		{"il2cpp_field_static_get_value", nullptr},
 	};
 
 	inline void ImportMethods()
@@ -95,10 +103,20 @@ public:
 		}
 	}
 
+	inline void SetMapMethodAddress(std::string method, void* newAddress)
+	{
+		if (il2cppMethodMap.find(method) == il2cppMethodMap.end())
+			return;
+		il2cppMethodMap[method] = newAddress;
+	}
+
 	inline Il2CppDomain *GetDomain() { return ((Il2CppDomain * (*)(void)) il2cppMethodMap["il2cpp_domain_get"])(); }
 	inline Il2CppAssembly *OpenDomainAssembly(Il2CppDomain *domain, const char *name) { return ((Il2CppAssembly * (*)(Il2CppDomain *, const char *)) il2cppMethodMap["il2cpp_domain_assembly_open"])(domain, name); }
 
 	inline char *GetTypeName(const Il2CppType *type) { return ((char *(*)(const Il2CppType *))il2cppMethodMap["il2cpp_type_get_name"])(type); }
+	inline bool TypeIsByref(const Il2CppType* type) { return ((bool (*)(const Il2CppType*))il2cppMethodMap["il2cpp_type_is_byref"])(type); }
+	inline uint32_t GetTypeAttrs(const Il2CppType* type) { return ((uint32_t(*)(const Il2CppType*))il2cppMethodMap["il2cpp_type_get_attrs"])(type); }
+	inline Il2CppClass* GetTypeClassOrElementClass(const Il2CppType* type) { return ((Il2CppClass * (*)(const Il2CppType*)) il2cppMethodMap["il2cpp_type_get_class_or_element_class"])(type); }
 
 	inline Il2CppThread *AttachThread(Il2CppDomain *domain) { return ((Il2CppThread * (*)(Il2CppDomain *)) il2cppMethodMap["il2cpp_thread_attach"])(domain); }
 	inline void DetachThread(Il2CppThread *thread) { ((void (*)(Il2CppThread *))il2cppMethodMap["il2cpp_thread_detach"])(thread); }
@@ -117,8 +135,14 @@ public:
 	inline FieldInfo *GetClassFields(Il2CppClass *klass, void **iter) { return ((FieldInfo * (*)(Il2CppClass *, void **)) il2cppMethodMap["il2cpp_class_get_fields"])(klass, iter); }
 	inline Il2CppClass *GetClassParent(Il2CppClass *klass) { return ((Il2CppClass * (*)(Il2CppClass *)) il2cppMethodMap["il2cpp_class_get_parent"])(klass); }
 	inline Il2CppType *GetClassNestedTypes(Il2CppClass *klass, void **iter) { return ((Il2CppType * (*)(Il2CppClass *, void **)) il2cppMethodMap["il2cpp_class_get_nested_types"])(klass, iter); }
-	inline int GetClassFlags(Il2CppClass *klass) { return ((int (*)(Il2CppClass *))il2cppMethodMap["il2cpp_class_get_flags"])(klass); }
-
+	inline int GetClassFlags(const Il2CppClass *klass) { return ((int (*)(const Il2CppClass *))il2cppMethodMap["il2cpp_class_get_flags"])(klass); }
+	inline bool ClassIsGeneric(const Il2CppClass* klass) { return ((bool (*)(const Il2CppClass*))il2cppMethodMap["il2cpp_class_is_generic"])(klass); }
+	inline bool ClassIsEnum(const Il2CppClass* klass) { return ((bool (*)(const Il2CppClass*))il2cppMethodMap["il2cpp_class_is_enum"])(klass); }
+	inline bool ClassIsValueType(const Il2CppClass* klass) { return ((bool (*)(const Il2CppClass*))il2cppMethodMap["il2cpp_class_is_valuetype"])(klass); }
+	inline Il2CppClass* GetClassFromType(const Il2CppType* type) { return ((Il2CppClass * (*)(const Il2CppType*))il2cppMethodMap["il2cpp_class_from_il2cpp_type"])(type); }
+	inline const Il2CppType* GetClassType(const Il2CppClass* klass) { return ((const Il2CppType * (*)(const Il2CppClass*))il2cppMethodMap["il2cpp_class_get_type"])(klass); }
+	inline Il2CppClass* GetClassElementClass(Il2CppClass* klass) { return ((Il2CppClass * (*)(Il2CppClass*))il2cppMethodMap["il2cpp_class_get_element_class"])(klass); }
+	
 	inline const Il2CppImage *GetAssemblyImage(const Il2CppAssembly *assembly) { return ((const Il2CppImage *(*)(const Il2CppAssembly *))il2cppMethodMap["il2cpp_assembly_get_image"])(assembly); }
 
 	inline const char *GetMethodName(const MethodInfo *method) { return ((const char *(*)(const MethodInfo *))il2cppMethodMap["il2cpp_method_get_name"])(method); }
@@ -134,8 +158,7 @@ public:
 	inline int GetFieldFlags(FieldInfo *field) { return ((int (*)(FieldInfo *))il2cppMethodMap["il2cpp_field_get_flags"])(field); }
 	inline const Il2CppType *GetFieldType(FieldInfo *field) { return ((const Il2CppType *(*)(FieldInfo *))il2cppMethodMap["il2cpp_field_get_type"])(field); }
 	inline size_t GetFieldOffset(FieldInfo *field) { return ((size_t(*)(FieldInfo *))il2cppMethodMap["il2cpp_field_get_offset"])(field); }
-
-	inline Il2CppClass *GetTypeClassOrElementClass(const Il2CppType *type) { return ((Il2CppClass * (*)(const Il2CppType *)) il2cppMethodMap["il2cpp_type_get_class_or_element_class"])(type); }
+	inline void StaticFieldGetValue(FieldInfo* field, void* value) { ((void (*)(FieldInfo*, void*))il2cppMethodMap["il2cpp_field_static_get_value"])(field, value); }
 };
 
 namespace Signature
@@ -307,7 +330,6 @@ public:
 	Il2CppThread *attachedThread;
 	std::unordered_map<std::string, Il2CppAssembly *> assemblies;
 	std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, Il2CppClass *>>> classes;
-	std::unordered_map<std::string, Il2CppType *> types;
 
 	inline NaResolver();
 	inline bool Setup(Config config);
@@ -316,8 +338,8 @@ public:
 	inline Il2CppClass *GetClass(std::string signature);
 	inline Il2CppMethodPointer GetMethod(Il2CppClass *klass, std::string signature);
 	inline FieldInfo *GetField(Il2CppClass *klass, std::string name);
-	inline Il2CppType *GetType(std::string signature);
-	inline Il2CppType *GetType(Il2CppClass *klass);
+	inline const Il2CppType *GetType(std::string signature);
+	inline const Il2CppType *GetType(Il2CppClass *klass);
 	inline std::string GetStringByIl2Cpp(Il2CppString *string);
 
 private:
@@ -337,7 +359,6 @@ NaResolver::NaResolver()
 	domain = nullptr;
 	assemblies = std::unordered_map<std::string, Il2CppAssembly *>();
 	classes = std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, Il2CppClass *>>>();
-	types = std::unordered_map<std::string, Il2CppType *>();
 }
 
 inline bool NaResolver::Setup(Config config)
@@ -385,8 +406,7 @@ inline void NaResolver::Destroy()
 	domain = nullptr;
 	assemblies.clear();
 	classes.clear();
-	types.clear();
-
+	
 	LogInfo("[NaResolver] Destroy success.");
 }
 
@@ -493,33 +513,21 @@ inline FieldInfo *NaResolver::GetField(Il2CppClass *klass, std::string name)
 	}
 }
 
-inline Il2CppType *NaResolver::GetType(std::string signature)
+inline const Il2CppType *NaResolver::GetType(std::string signature)
 {
-	if (types.find(signature) != types.end())
-		return types[signature];
-	static auto func = ((Il2CppType * (*)(Il2CppString * typeName, MethodInfo * method))
-							GetMethod(GetClassEx("mscorlib", "System", "Type"), "System.Type GetType(System.String)"));
-	Il2CppType *result = func(il2CppManager.NewString(signature.c_str()), nullptr);
-	if (!result)
-	{
-		LogError("[NaResolver] Could not find the type: %s", signature.c_str());
+	std::string assembly, nameSpace, name;
+	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), &assembly, &nameSpace, &name);
+	Il2CppClass* klass = GetClassEx(assembly, nameSpace, name);
+	if (klass == nullptr)
 		return nullptr;
-	}
-	types[signature] = result;
-	return result;
+	return il2CppManager.GetClassType(klass);
 }
 
-inline Il2CppType *NaResolver::GetType(Il2CppClass *klass)
+inline const Il2CppType *NaResolver::GetType(Il2CppClass *klass)
 {
 	if (klass == nullptr)
 		return nullptr;
-	std::string signature = ConfusedTranslate::RestoreKlass(Signature::Class::Create(klass, il2CppManager));
-	std::string assembly, nameSpace, name;
-	Signature::Class::Analysis(signature, &assembly, &nameSpace, &name);
-	std::string typeSignature = name + ", " + assembly;
-	if (nameSpace.size() > 0)
-		typeSignature = nameSpace + "." + typeSignature;
-	return GetType(typeSignature);
+	return il2CppManager.GetClassType(klass);
 }
 
 inline std::string NaResolver::GetStringByIl2Cpp(Il2CppString *string)
@@ -591,4 +599,4 @@ inline bool NaResolver::MethodVerifyParams(const MethodInfo *method, std::vector
 #define STATIC_MEMBER(klass, name, offset)                                                                                                                 \
 	static klass get_##name() { return *reinterpret_cast<klass *>(*reinterpret_cast<uintptr_t *>((uintptr_t)ThisClass() + STATIC_AREA_OFFSET) + offset); } \
 	static void set_##name(klass value) { *reinterpret_cast<klass *>(*reinterpret_cast<uintptr_t *>((uintptr_t)ThisClass() + STATIC_AREA_OFFSET) + offset) = value; }
-#define METHOD(returnType, parameters, signature) static auto __fn = (returnType(*) parameters)(Il2CppResolver->GetMethod(ThisClass(), signature));
+#define METHOD(returnType, parameters, signature) static auto function = (returnType(*) parameters)(Il2CppResolver->GetMethod(ThisClass(), signature));
