@@ -9,7 +9,8 @@
 #include <dxgi.h>
 #include <d3d11.h>
 
-#include <NaLibrary/NaResolver/NaResolver - Api.h>
+#define __NARESOLVER_ONLY_API
+#include <NaLibrary/NaResolver/NaResolver.h>
 
 #include <NaLibrary/NaLogger/NaLogger.h>
 #include "Config/Logger.h"
