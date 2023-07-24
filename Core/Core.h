@@ -11,7 +11,7 @@ struct PreAnalysisKlass
 
 inline const std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-	PreAnalysisKlass({ "Assembly-CSharp", "", "WeaponManager" }),
+
 };
 
 struct FieldStructure

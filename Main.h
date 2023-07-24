@@ -24,10 +24,6 @@ inline NaLogger logger = NaLogger(
 	, new Config::Logger::LoggerCallbackConfig()
 );
 
-#include <UnityEngine SDK/UnityEngine.h>
-
-#include <NaLibrary/NaHook/NaHook.h>
-
 #include "Core/Core.h"
 bool Il2CppResolverInit();
 void Run();
