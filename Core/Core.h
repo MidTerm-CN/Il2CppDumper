@@ -5,7 +5,6 @@
 
 const std::unordered_map<std::string, std::string> csTypeMap
 {
-	{ "System::Collections::Generic::Dictionary",	"Dictionary" },
 	{ "System::Boolean",	"bool" },
 	{ "System::Byte",		"uint8_t" },
 	{ "System::SByte",		"int8_t" },
@@ -36,10 +35,16 @@ struct PreAnalysisKlass
 	std::string name;
 };
 
-inline const std::vector<PreAnalysisKlass> preAnalysisKlassList =
+inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-	{ "UnityEngine.CoreModule", "UnityEngine", "Application" },
-	{ "UnityEngine.CoreModule", "UnityEngine", "GameObject" },
+	//{ "UnityEngine.CoreModule", "UnityEngine", "Application" },
+	//{ "UnityEngine.CoreModule", "UnityEngine", "GameObject" },
+};
+
+inline std::vector<std::string> preAnalysisAssemblyList =
+{
+	"Assembly-CSharp",
+	"UnityEngine.CoreModule"
 };
 
 struct FieldStructure
@@ -54,7 +59,8 @@ struct FieldStructure
 	bool valueField;
 	bool backingField;
 	bool arrayField;
-
+	bool dictionaryField;
+	
 	struct FieldElementStructure
 	{
 		std::string type;
@@ -228,7 +234,8 @@ inline FieldStructure AnalysisField(FieldInfo* field)
 	if (fieldStructure.backingField)
 		BackingFieldNameRationalization(fieldStructure.name);
 	fieldStructure.arrayField = TypeIsArray(fieldStructure.type);
-	bool array = fieldStructure.arrayField;
+	//fieldStructure.dictionaryField = TypeIsDictionary(fieldStructure.type);
+	bool array = fieldStructure.arrayField || fieldStructure.dictionaryField;
 	if (array)
 	{
 		Il2CppClass* elementKlass = ApiManager.GetClassElementClass(klass);
@@ -270,23 +277,31 @@ inline MethodStructure AnalysisMethod(const MethodInfo* method)
 	return methodStructure;
 }
 
-inline std::string GetKlassAssemble(Il2CppClass* klass)
+inline std::string GetAssemblyName(const Il2CppAssembly* assembly)
 {
 	struct _Il2CppAssembly
 	{
 		char __pad__[sizeof(void*) + sizeof(uint32_t) + sizeof(int32_t) + sizeof(int32_t)];
 		const char* name;
 	};
-	const Il2CppImage* image = ApiManager.GetClassImage(klass);
-	if (!image)
-		return std::string();
-	const Il2CppAssembly* assembly = ApiManager.GetImageAssembly(image);
 	if (!assembly)
 		return std::string();
 	const _Il2CppAssembly* _assembly = (_Il2CppAssembly*)assembly;
 	if (!_assembly)
 		return std::string();
 	return _assembly->name;
+}
+
+inline std::string GetKlassAssembly(Il2CppClass* klass)
+{
+
+	const Il2CppImage* image = ApiManager.GetClassImage(klass);
+	if (!image)
+		return std::string();
+	const Il2CppAssembly* assembly = ApiManager.GetImageAssembly(image);
+	if (!assembly)
+		return std::string();
+	return GetAssemblyName(assembly);
 }
 
 inline KlassStructure AnalysisKlass(Il2CppClass* klass)
@@ -307,7 +322,7 @@ inline KlassStructure AnalysisKlass(Il2CppClass* klass)
 	klassStructure.klass.name = klassStructure.name;
 	klassStructure.klass.name = klassStructure.name;
 	klassStructure.klass.nameSpace = ApiManager.GetClassNamespace(klass);
-	klassStructure.klass.assemblyName = GetKlassAssemble(klass);
+	klassStructure.klass.assemblyName = GetKlassAssembly(klass);
 	klassStructure.inheritance = GetKlassInheritance(klass);
 	klassStructure.flags = GetKlassFlag(ApiManager.GetClassFlags(klass));
 	klassStructure.baseKlass = GetKlassParent(klass);
@@ -614,6 +629,72 @@ inline void RunResolver()
 	if (!std::filesystem::exists(path)) std::filesystem::create_directory(path);
 
 	logger.LogInfo("NaDUGR is running!");
+	logger.LogInfo("PreAnalysisAssemblyList size: %d", preAnalysisAssemblyList.size());
+	{
+		size_t assembliesSize = 0;
+		const Il2CppAssembly** assemblies = ApiManager.GetAssemblies(Il2CppResolver->domain, &assembliesSize);
+		if (assembliesSize <= 0 || assemblies == nullptr)
+		{
+			logger.LogFatal("Failed to get assemblies!");
+			return;
+		}
+		std::vector<const Il2CppAssembly*> preAnalysisAssemblies;
+		for (int i = 0; i < assembliesSize; i++)
+		{
+			if (preAnalysisAssemblies.size() == preAnalysisAssemblyList.size())
+			{
+				break;
+			}
+			const Il2CppAssembly* assembly = assemblies[i];
+			if (assembly == nullptr)
+				continue;
+			std::string assemblyName = GetAssemblyName(assembly);
+			if (std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName) != preAnalysisAssemblyList.end())
+			{
+				preAnalysisAssemblies.push_back(assembly);
+				preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName));
+			}
+		}
+		if (!preAnalysisAssemblyList.empty())
+		{
+			logger.LogFatal("Failed to find assemblies: ");
+			for (auto& item : preAnalysisAssemblyList)
+			{
+				logger.LogWarning("\t%s", item.c_str());
+			}
+		}
+		// 把preAnalysisAssemblies里的每一个Il2CppAssembly的所有类都解析后加到preAnalysisKlassList
+		for (auto& assembly : preAnalysisAssemblies)
+		{
+			std::string assemblyName = GetAssemblyName(assembly);
+			const Il2CppImage* image = ApiManager.GetAssemblyImage(assembly);
+			if (image == nullptr)
+			{
+				logger.LogFatal("Failed to get image of assembly: %s", assemblyName.c_str());
+				return;
+			}
+			size_t klassSize = ApiManager.GetImageClassCount(image);
+			if (klassSize <= 0)
+			{
+				logger.LogFatal("Failed to get class count of image: %s", assemblyName.c_str());
+				return;
+			}
+			for (size_t i = 0; i < klassSize; i++)
+			{
+				Il2CppClass* klass = (Il2CppClass*)ApiManager.GetImageClass(image, i);
+				if (klass == nullptr)
+				{
+					logger.LogFatal("Failed to get class of image: %s", assemblyName.c_str());
+					return;
+				}
+				std::string name = ApiManager.GetClassName(klass);
+				if (name == "<Module>")
+					continue;
+				std::string nameSpace = ApiManager.GetClassNamespace(klass);
+				preAnalysisKlassList.push_back({ assemblyName, nameSpace, name });
+			}
+		}
+	}
 	logger.LogInfo("PreAnalysisKlassList size: %d", preAnalysisKlassList.size());
 	for (size_t i = 0; i < preAnalysisKlassList.size(); i++)
 	{

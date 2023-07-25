@@ -26,8 +26,6 @@ void Run()
 	try
 	{
 		logger.LogInfo("Perfect loaded!");
-		logger.LogInfo("Hack version: " HACK_VERSION);
-		logger.LogInfo("For Game version: " ADAPTATION_GAME_VERSION);
 		if (!Il2CppResolverInit())
 			return;
 		logger.LogDebug("Il2CppResolverInit success!");

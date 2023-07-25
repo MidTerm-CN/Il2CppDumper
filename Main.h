@@ -1,8 +1,5 @@
 #pragma once
 
-#define ADAPTATION_GAME_VERSION "v1.341"
-#define HACK_VERSION "v1.0.0"
-
 #include <Windows.h>
 #include <filesystem>
 #include <fstream>
