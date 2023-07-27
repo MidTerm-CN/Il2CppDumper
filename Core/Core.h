@@ -5,21 +5,23 @@
 
 inline std::unordered_map<std::string, std::string> csTypeMap
 {
-	{ "System::Boolean",	"bool" },
-	{ "System::Byte",		"uint8_t" },
-	{ "System::SByte",		"int8_t" },
-	{ "System::Char",		"uint16_t" },
-	{ "System::Int16",		"int16_t" },
-	{ "System::UInt16",		"uint16_t" },
-	{ "System::Int32",		"int32_t" },
-	{ "System::UInt32",		"uint32_t" },
-	{ "System::Int64",		"int64_t" },
-	{ "System::UInt64",		"uint64_t" },
-	{ "System::Single",		"float" },
-	{ "System::Double",		"double" },
-	{ "System::String",		"Il2CppString*" },
-	{ "System::Object",		"Il2CppObject*" },
-	{ "System::Void",		"void" },
+	{ "System::Boolean",				"bool" },
+	{ "System::Byte",					"uint8_t" },
+	{ "System::SByte",					"int8_t" },
+	{ "System::Char",					"uint16_t" },
+	{ "System::Int16",					"int16_t" },
+	{ "System::UInt16",					"uint16_t" },
+	{ "System::Int32",					"int32_t" },
+	{ "System::UInt32",					"uint32_t" },
+	{ "System::Int64",					"int64_t" },
+	{ "System::UInt64",					"uint64_t" },
+	{ "System::Single",					"float" },
+	{ "System::Double",					"double" },
+	{ "System::String",					"Il2CppString*" },
+	{ "System::Object",					"Il2CppObject*" },
+	{ "System::Void",					"void" },
+	{ "System::MulticastDelegate",		"Il2CppMulticastDelegate" },
+	{ "System::Delegate",				"Il2CppDelegate" },
 };
 
 const std::unordered_map<std::string, std::string> csOperatorMap
@@ -45,7 +47,7 @@ inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
-	//"UnityEngine.CoreModule",
+	"UnityEngine.CoreModule",
 	"Assembly-CSharp",
 };
 
@@ -437,7 +439,7 @@ inline void TypeDispose(std::string& type, Il2CppClass* klass)
 	}
 	if (isGeneric)
 	{
-		goto save;
+		return;
 	}
 	type += "*";
 save:
