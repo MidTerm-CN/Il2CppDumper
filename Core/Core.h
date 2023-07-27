@@ -651,11 +651,14 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	std::string result = "";
 	std::vector<std::string> namespaceList = GetNamespaceList(klass.klass.nameSpace);
 
-	for (auto& item : namespaceList)
+	if (!klass.klass.nameSpace.empty())
 	{
-		result += "namespace ";
-		result += item;
-		result += "\n{\n";
+		for (auto& item : namespaceList)
+		{
+			result += "namespace ";
+			result += item;
+			result += "\n{\n";
+		}
 	}
 	
 	std::string inheritance = "";
@@ -869,9 +872,12 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	}
 	result += "};\n\n";
 	
-	for (size_t i = 0; i < namespaceList.size(); i++)
+	if (!klass.klass.nameSpace.empty())
 	{
-		result += "}\n";
+		for (size_t i = 0; i < namespaceList.size(); i++)
+		{
+			result += "}\n";
+		}
 	}
 	return result;
 }
