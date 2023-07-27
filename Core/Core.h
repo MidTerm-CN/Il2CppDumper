@@ -33,18 +33,18 @@ struct PreAnalysisKlass
 	std::string assemblyName;
 	std::string nameSpace;
 	std::string name;
+	Il2CppClass* klass = nullptr;
 };
 
 inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-	//{ "UnityEngine.CoreModule", "UnityEngine", "Application" },
-	//{ "UnityEngine.CoreModule", "UnityEngine", "GameObject" },
+	{ "Assembly-CSharp", "", "WeaponManager" },
 };
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
+	"UnityEngine.CoreModule",
 	"Assembly-CSharp",
-	"UnityEngine.CoreModule"
 };
 
 struct FieldStructure
@@ -182,7 +182,8 @@ inline std::string GetKlassFlag(int flagIndex)
 	if (flagIndex & 0x0080) flags += "Notserialized | ";
 	if (flagIndex & 0x0200) flags += "Specialname | ";
 	if (flagIndex & 0x2000) flags += "Pinvokeimpl | ";
-	for (size_t i = 0; i < 2; i++)
+	if (flags.empty()) return flags;
+	for (size_t i = 0; i < 3; i++)
 		flags.pop_back();
 	return flags;
 }
@@ -207,7 +208,8 @@ inline std::string GetMethodFlag(int flagIndex)
 	if (flagIndex & 0x2000) flags += "Pinvokeimpl | ";
 	if (flagIndex & 0x4000) flags += "Hassecurity | ";
 	if (flagIndex & 0x8000) flags += "Requiresecobject | ";
-	for (size_t i = 0; i < 2; i++)
+	if (flags.empty()) return flags;
+	for (size_t i = 0; i < 3; i++)
 		flags.pop_back();
 	return flags;
 }
@@ -388,7 +390,7 @@ inline void PretreatmentFieldStructure(FieldStructure& field)
 		return;
 	if (field.arrayField)
 	{
-		int arrayCount = field.elements.size();
+		int arrayCount = (int)field.elements.size();
 		if (csTypeMap.find(field.elements.at(arrayCount - 1).type) != csTypeMap.end())
 			field.elements.at(arrayCount - 1).type = csTypeMap.at(field.elements.at(arrayCount - 1).type);
 		field.type = field.elements.at(arrayCount - 1).type;
@@ -629,136 +631,164 @@ inline void RunResolver()
 	if (!std::filesystem::exists(path)) std::filesystem::create_directory(path);
 
 	logger.LogInfo("NaDUGR is running!");
-	logger.LogInfo("PreAnalysisAssemblyList size: %d", preAnalysisAssemblyList.size());
+	logger.level = NaLoggerLevel_Warning;
+	clock_t allStartTime = clock();
+	try
 	{
-		size_t assembliesSize = 0;
-		const Il2CppAssembly** assemblies = ApiManager.GetAssemblies(Il2CppResolver->domain, &assembliesSize);
-		if (assembliesSize <= 0 || assemblies == nullptr)
+		logger.LogInfo("PreAnalysisAssemblyList size: %d", preAnalysisAssemblyList.size());
 		{
-			logger.LogFatal("Failed to get assemblies!");
-			return;
-		}
-		std::vector<const Il2CppAssembly*> preAnalysisAssemblies;
-		for (int i = 0; i < assembliesSize; i++)
-		{
-			if (preAnalysisAssemblies.size() == preAnalysisAssemblyList.size())
+			size_t assembliesSize = 0;
+			const Il2CppAssembly** assemblies = ApiManager.GetAssemblies(Il2CppResolver->domain, &assembliesSize);
+			if (assembliesSize <= 0 || assemblies == nullptr)
 			{
-				break;
+				throw std::exception("Failed to get assemblies!");
 			}
-			const Il2CppAssembly* assembly = assemblies[i];
-			if (assembly == nullptr)
-				continue;
-			std::string assemblyName = GetAssemblyName(assembly);
-			if (std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName) != preAnalysisAssemblyList.end())
+			std::vector<const Il2CppAssembly*> preAnalysisAssemblies;
+			for (int i = 0; i < assembliesSize; i++)
 			{
-				preAnalysisAssemblies.push_back(assembly);
-				preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName));
-			}
-		}
-		if (!preAnalysisAssemblyList.empty())
-		{
-			logger.LogFatal("Failed to find assemblies: ");
-			for (auto& item : preAnalysisAssemblyList)
-			{
-				logger.LogWarning("\t%s", item.c_str());
-			}
-		}
-		// 把preAnalysisAssemblies里的每一个Il2CppAssembly的所有类都解析后加到preAnalysisKlassList
-		for (auto& assembly : preAnalysisAssemblies)
-		{
-			std::string assemblyName = GetAssemblyName(assembly);
-			const Il2CppImage* image = ApiManager.GetAssemblyImage(assembly);
-			if (image == nullptr)
-			{
-				logger.LogFatal("Failed to get image of assembly: %s", assemblyName.c_str());
-				return;
-			}
-			size_t klassSize = ApiManager.GetImageClassCount(image);
-			if (klassSize <= 0)
-			{
-				logger.LogFatal("Failed to get class count of image: %s", assemblyName.c_str());
-				return;
-			}
-			for (size_t i = 0; i < klassSize; i++)
-			{
-				Il2CppClass* klass = (Il2CppClass*)ApiManager.GetImageClass(image, i);
-				if (klass == nullptr)
+				if (preAnalysisAssemblies.size() == preAnalysisAssemblyList.size())
 				{
-					logger.LogFatal("Failed to get class of image: %s", assemblyName.c_str());
-					return;
+					break;
 				}
-				std::string name = ApiManager.GetClassName(klass);
-				if (name == "<Module>")
+				const Il2CppAssembly* assembly = assemblies[i];
+				if (assembly == nullptr)
 					continue;
-				std::string nameSpace = ApiManager.GetClassNamespace(klass);
-				preAnalysisKlassList.push_back({ assemblyName, nameSpace, name });
+				std::string assemblyName = GetAssemblyName(assembly);
+				std::vector<std::string>::iterator it = std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName);
+				if (it != preAnalysisAssemblyList.end())
+				{
+					preAnalysisAssemblies.push_back(assembly);
+					preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName));
+				}
 			}
-		}
-	}
-	logger.LogInfo("PreAnalysisKlassList size: %d", preAnalysisKlassList.size());
-	for (size_t i = 0; i < preAnalysisKlassList.size(); i++)
-	{
-		logger.LogInfo("PreAnalysisKlassList[%d] name: %s", i, preAnalysisKlassList[i].name.c_str());
-		logger.LogInfo("PreAnalysisKlassList[%d] nameSpace: %s", i, preAnalysisKlassList[i].nameSpace.c_str());
-		logger.LogInfo("PreAnalysisKlassList[%d] assemblyName: %s", i, preAnalysisKlassList[i].assemblyName.c_str());
-	}
-	logger.LogInfo("Work strat.\n\n");
-	std::vector<KlassStructure> klassStructures;
-	for (auto& klass : preAnalysisKlassList)
-	{
-		clock_t startTime = clock();
-		logger.LogInfo("AnalysisKlass: %s", klass.name.c_str());
-		Il2CppClass* il2CppClass = Il2CppResolver->GetClassEx(klass.assemblyName, klass.nameSpace, klass.name);
-		if (il2CppClass == nullptr)
-		{
-			logger.LogError("AnalysisKlass: %s failed!", klass.name.c_str());
-			continue;
-		}
-		klassStructures.push_back(AnalysisKlass(il2CppClass));
-		logger.LogInfo("AnalysisKlass: %s success (%dms)!\n\n", klass.name.c_str(), clock() - startTime);
-	}
-	for (auto& klass : klassStructures)
-	{
-		logger.LogInfo("Klass name: %s", klass.name.c_str());
-		std::string inheritance = "";
-		for (auto& item : klass.inheritance)
-			inheritance += item + (item != klass.inheritance.back() ? std::string(" -> ") : "");
-		logger.LogInfo("Inheritance: %s", inheritance.c_str());
-		logger.LogInfo("Flags: %s", klass.flags.c_str());
-		logger.LogInfo("BaseKlass: %s", klass.baseKlass.c_str());
-		logger.LogInfo("Fields:");
-		for (auto& field : klass.fields)
-			logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
-		logger.LogInfo("StaticFields:");
-		for (auto& field : klass.staticFields)
-			logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
-		logger.LogInfo("Methods:");
-		for (auto& method : klass.methods)
-		{
-			std::string name = method.name + "(";
-			for (auto& item : method.parameters)
+			if (!preAnalysisAssemblyList.empty())
 			{
-				name += item.type + " " + item.name + (item.name != method.parameters.back().name ? std::string(", ") : "");
+				logger.LogWarning("Failed to find assemblies: ");
+				for (auto& item : preAnalysisAssemblyList)
+				{
+					logger.LogWarning("\t%s", item.c_str());
+				}
 			}
-			name += ")";
-			logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+			for (auto& assembly : preAnalysisAssemblies)
+			{
+				std::string assemblyName = GetAssemblyName(assembly);
+				const Il2CppImage* image = ApiManager.GetAssemblyImage(assembly);
+				if (image == nullptr)
+				{
+					throw std::exception(("Failed to get image of assembly: " + assemblyName).c_str());
+				}
+				size_t klassSize = ApiManager.GetImageClassCount(image);
+				if (klassSize <= 0)
+				{
+					throw std::exception(("Failed to get class count of image: " + assemblyName).c_str());
+				}
+				for (size_t i = 0; i < klassSize; i++)
+				{
+					Il2CppClass* klass = (Il2CppClass*)ApiManager.GetImageClass(image, i);
+					if (klass == nullptr)
+					{
+						throw std::exception(("Failed to get class of image: " + assemblyName).c_str());
+					}
+					std::string name = ApiManager.GetClassName(klass);
+					if (name == "<Module>")
+						continue;
+					std::string nameSpace = ApiManager.GetClassNamespace(klass);
+					preAnalysisKlassList.push_back({ assemblyName, nameSpace, name, klass });
+				}
+			}
 		}
-		logger.LogInfo("StaticMethods:");
-		for (auto& method : klass.staticMethods)
+		logger.LogInfo("PreAnalysisKlassList size: %d", preAnalysisKlassList.size());
+		for (size_t i = 0; i < preAnalysisKlassList.size(); i++)
 		{
-			std::string name = method.name + "(";
-			for (auto& item : method.parameters)
-				name += item.type + (item.type != method.parameters.back().type ? std::string(", ") : ")");
-			name += ")";
-			logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+			PreAnalysisKlass& klass = preAnalysisKlassList[i];
+			if (klass.klass == nullptr)
+			{
+				Il2CppClass* insurance = Il2CppResolver->GetClassEx(klass.assemblyName.c_str(), klass.nameSpace.c_str(), klass.name.c_str());
+				if (insurance == nullptr)
+				{
+					logger.LogWarning("Failed to get class: %s.%s.%s", klass.assemblyName.c_str(), klass.nameSpace.c_str(), klass.name.c_str());
+					continue;
+				}
+				klass.klass = insurance;
+			}
+			logger.LogInfo("PreAnalysisKlassList : %d", i);
+			logger.LogInfo("	name: %s", klass.name.c_str());
+			logger.LogInfo("	nameSpace: %s", klass.nameSpace.c_str());
+			logger.LogInfo("	assemblyName: %s", klass.assemblyName.c_str());
+			logger.LogInfo("	klass: %p", klass.klass);
 		}
-		logger.LogInfo("NestedKlasses:");
-		for (auto& nestedKlass : klass.nestedKlasses)
-			logger.LogInfo("    %s", nestedKlass.name.c_str());
-		std::string klassStructure = GenerateKlassStructure(klass);
-		std::filesystem::path logFilePath = path / (klass.name + std::string(".h"));
-		std::ofstream file = std::ofstream(logFilePath, std::ios::out);
-		file << klassStructure;
+		logger.LogInfo("Work strat.\n\n");
+		std::vector<KlassStructure> klassStructures;
+		for (auto& klass : preAnalysisKlassList)
+		{
+			clock_t startTime = clock();
+			logger.LogInfo("AnalysisKlass: %s", klass.name.c_str());
+			Il2CppClass* il2CppClass = klass.klass;
+			if (il2CppClass == nullptr)
+			{
+				logger.LogWarning("AnalysisKlass: %s failed! \n\n", klass.name.c_str());
+				continue;
+			}
+			klassStructures.push_back(AnalysisKlass(il2CppClass));
+			logger.LogInfo("AnalysisKlass: %s success (%dms)!\n\n", klass.name.c_str(), clock() - startTime);
+		}
+		for (auto& klass : klassStructures)
+		{
+			logger.LogInfo("Klass name: %s", klass.name.c_str());
+			std::string inheritance = "";
+			for (auto& item : klass.inheritance)
+				inheritance += item + (item != klass.inheritance.back() ? std::string(" -> ") : "");
+			logger.LogInfo("Inheritance: %s", inheritance.c_str());
+			logger.LogInfo("Flags: %s", klass.flags.c_str());
+			logger.LogInfo("BaseKlass: %s", klass.baseKlass.c_str());
+			logger.LogInfo("Fields:");
+			for (auto& field : klass.fields)
+				logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
+			logger.LogInfo("StaticFields:");
+			for (auto& field : klass.staticFields)
+				logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
+			logger.LogInfo("Methods:");
+			for (auto& method : klass.methods)
+			{
+				std::string name = method.name + "(";
+				for (auto& item : method.parameters)
+				{
+					name += item.type + " " + item.name + (item.name != method.parameters.back().name ? std::string(", ") : "");
+				}
+				name += ")";
+				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+			}
+			logger.LogInfo("StaticMethods:");
+			for (auto& method : klass.staticMethods)
+			{
+				std::string name = method.name + "(";
+				for (auto& item : method.parameters)
+					name += item.type + (item.type != method.parameters.back().type ? std::string(", ") : ")");
+				name += ")";
+				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+			}
+			logger.LogInfo("NestedKlasses:");
+			for (auto& nestedKlass : klass.nestedKlasses)
+				logger.LogInfo("    %s", nestedKlass.name.c_str());
+			std::string klassStructure = GenerateKlassStructure(klass);
+			
+			std::filesystem::path assemblyPath = path / klass.klass.assemblyName;
+			if (!std::filesystem::exists(assemblyPath)) std::filesystem::create_directory(assemblyPath);
+			if (klass.klass.nameSpace.empty()) klass.klass.nameSpace = "__NO_NAMESPACE__";
+			std::filesystem::path namespacePath = assemblyPath / klass.klass.nameSpace;
+			if (!std::filesystem::exists(namespacePath)) std::filesystem::create_directory(namespacePath);
+			std::filesystem::path klassPath = namespacePath / (klass.klass.name + ".h");
+			if (std::filesystem::exists(klassPath)) std::filesystem::remove(klassPath);
+			std::ofstream file = std::ofstream(klassPath, std::ios::out);
+			file << klassStructure;
+		}
 	}
+	catch (const std::exception& e)
+	{
+		logger.level = NaLoggerLevel_All;
+		logger.LogFatal("Exception in work : %s", e.what());
+	}
+	logger.level = NaLoggerLevel_All;
+	logger.LogInfo("Work end (%dms)!", clock() - allStartTime);
 	logger.LogInfo("NaDUGR is done!");
 }

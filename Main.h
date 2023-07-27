@@ -13,13 +13,7 @@
 #include "Config/Logger.h"
 
 inline NaLogger logger = NaLogger(
-#ifdef _DEBUG
-	NaLoggerLevel_All
-#else
-	NaLoggerLevel_Fatal
-#endif
-	, "[ NaDUGR ]"
-	, new Config::Logger::LoggerCallbackConfig()
+	NaLoggerLevel_All, "[ NaDUGR ]"	, new Config::Logger::LoggerCallbackConfig()
 );
 
 #include "Core/Core.h"
