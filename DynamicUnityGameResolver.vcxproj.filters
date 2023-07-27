@@ -7,9 +7,6 @@
     <Filter Include="Dependence">
       <UniqueIdentifier>{c261dae3-ae9d-4624-82db-b1184240f00e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Dependence\MinHook">
-      <UniqueIdentifier>{55609245-12e7-47ff-b6df-7d7fef9c2391}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Dependence\NaLibrary">
       <UniqueIdentifier>{02136ecf-8a82-4908-8aa5-2480389b7ba4}</UniqueIdentifier>
     </Filter>
@@ -22,9 +19,6 @@
     <Filter Include="Dependence\NaLibrary\NaLogger">
       <UniqueIdentifier>{7aaef235-29bf-486f-83eb-67515ed2f1d3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Dependence\NaLibrary\NaHook">
-      <UniqueIdentifier>{88794202-6692-4958-9e67-d761e1519158}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllMain.cpp">
@@ -33,26 +27,8 @@
     <ClCompile Include="Main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\MinHook\buffer.c">
-      <Filter>Dependence\MinHook</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\MinHook\hde32.c">
-      <Filter>Dependence\MinHook</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\MinHook\hde64.c">
-      <Filter>Dependence\MinHook</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\MinHook\hook.c">
-      <Filter>Dependence\MinHook</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\MinHook\trampoline.c">
-      <Filter>Dependence\MinHook</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaLogger\NaLogger.cpp">
       <Filter>Dependence\NaLibrary\NaLogger</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaHook\NaHook.cpp">
-      <Filter>Dependence\NaLibrary\NaHook</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -62,35 +38,8 @@
     <ClInclude Include="Config\Logger.h">
       <Filter>Config</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\buffer.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\hde32.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\hde64.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\MinHook.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\pstdint.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\table32.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\table64.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\MinHook\trampoline.h">
-      <Filter>Dependence\MinHook</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaLogger\NaLogger.h">
       <Filter>Dependence\NaLibrary\NaLogger</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaHook\NaHook.h">
-      <Filter>Dependence\NaLibrary\NaHook</Filter>
     </ClInclude>
     <ClInclude Include="Core\Core.h">
       <Filter>Core</Filter>

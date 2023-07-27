@@ -630,9 +630,34 @@ inline void PretreatmentGenericType(KlassStructure& klass)
 
 inline std::string GenerateKlassStructure(KlassStructure klass);
 
+inline std::vector<std::string> GetNamespaceList(const std::string& nameSpace)
+{
+	std::vector<std::string> result;
+	std::string waitForSplit = nameSpace;
+	std::string::size_type pos = waitForSplit.find('.');
+	while (pos != std::string::npos)
+	{
+		std::string temp = waitForSplit.substr(0, pos);
+		result.push_back(temp);
+		waitForSplit = waitForSplit.substr(pos + 1);
+		pos = waitForSplit.find('.');
+	}
+	result.push_back(waitForSplit);
+	return result;
+}
+
 inline std::string GenerateClassKlassStructure(KlassStructure klass)
 {
 	std::string result = "";
+	std::vector<std::string> namespaceList = GetNamespaceList(klass.klass.nameSpace);
+
+	for (auto& item : namespaceList)
+	{
+		result += "namespace ";
+		result += item;
+		result += "\n{\n";
+	}
+	
 	std::string inheritance = "";
 	for (auto& item : klass.inheritance)
 		inheritance += item + (item != klass.inheritance.back() ? std::string(" -> ") : "");
@@ -843,6 +868,11 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 		result.pop_back();
 	}
 	result += "};\n\n";
+	
+	for (size_t i = 0; i < namespaceList.size(); i++)
+	{
+		result += "}\n";
+	}
 	return result;
 }
 
@@ -974,6 +1004,7 @@ inline void RunResolver()
 		}
 		logger.LogInfo("Work strat.\n\n");
 		std::vector<KlassStructure> klassStructures;
+		std::vector<std::string> assemblyNames;
 		for (auto& klass : preAnalysisKlassList)
 		{
 			if (klass.notSupported)
@@ -1047,7 +1078,61 @@ inline void RunResolver()
 				if (std::filesystem::exists(klassPath)) std::filesystem::remove(klassPath);
 				std::ofstream file = std::ofstream(klassPath, std::ios::out);
 				file << klassStructure;
+				file.close();
+				if (klass.klass.nameSpace.compare("__NO_NAMESPACE__") == 0)
+				{
+					klass.klass.nameSpace = "";
+				}
+				if (std::find(assemblyNames.begin(), assemblyNames.end(), klass.klass.assemblyName) == assemblyNames.end())
+					assemblyNames.push_back(klass.klass.assemblyName);
 			}
+		}
+		for (const auto& assembly : assemblyNames)
+		{
+			std::filesystem::path assemblyPath = path / assembly;
+			std::filesystem::path assemblyHeaderPath = assemblyPath / (assembly + "AdvanceDeclaration.h");
+			if (std::filesystem::exists(assemblyHeaderPath)) std::filesystem::remove(assemblyHeaderPath);
+			std::ofstream file = std::ofstream(assemblyHeaderPath, std::ios::out);
+			file << "#pragma once\n\n";
+			for (const auto& klass : klassStructures)
+			{
+				if (klass.klass.assemblyName == assembly)
+				{
+					std::vector<std::string> namespaces = GetNamespaceList(klass.klass.nameSpace);
+					if (!klass.klass.nameSpace.empty())
+					{
+						for (auto& item : namespaces)
+							file << "namespace " + item + " {";
+					}
+					file << "class " << klass.klass.name << ";";
+					if (!klass.klass.nameSpace.empty())
+					{
+						for (auto& item : namespaces)
+							file << "}";
+					}
+					file << "\n";
+				}
+			}
+			file.close();
+		}
+		for (const auto& assembly : assemblyNames)
+		{
+			std::filesystem::path assemblyPath = path / assembly;
+			std::filesystem::path assemblyHeaderPath = assemblyPath / (assembly + "Include.h");
+			if (std::filesystem::exists(assemblyHeaderPath)) std::filesystem::remove(assemblyHeaderPath);
+			std::ofstream file = std::ofstream(assemblyHeaderPath, std::ios::out);
+			file << "#pragma once\n\n";
+			file << "#include \"" << assembly << "AdvanceDeclaration.h\"\n\n";
+			for (const auto& klass : klassStructures)
+			{
+				if (klass.klass.assemblyName == assembly)
+				{
+					std::string nameSpace = klass.klass.nameSpace.empty() ? "__NO_NAMESPACE__" : klass.klass.nameSpace;
+					std::string includePath = nameSpace + "/" + klass.klass.name + ".h";
+					file << "#include \"" << includePath << "\"\n";
+				}
+			}
+			file.close();
 		}
 	}
 	catch (const std::exception& e)
