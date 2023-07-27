@@ -55,7 +55,6 @@ public:
 	NaLoggerLevel level;
 	NaLoggerTimestamp creationTime;
 	NaLoggerCallbacks* callbacks;
-	std::vector<NaLogItem> logItems;
 	
 	NaLogger(NaLoggerLevel level, std::string name = "[NaLogger]", NaLoggerCallbacks* callbacks = {});
 	NaLogger(NaLoggerLevel level, NaLoggerCallbacks* callbacks = {});

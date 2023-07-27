@@ -14,11 +14,19 @@ bool Il2CppResolverInit()
 {
 	NaResolver::Config config;
 	config.enableLogger = true;
-	config.logger.debug = [](std::string m, ...)->void { LOGGER_MESSAGE_BUFFER(Debug); };
-	config.logger.info = [](std::string m, ...)->void { LOGGER_MESSAGE_BUFFER(Info); };
-	config.logger.error = [](std::string m, ...)->void { LOGGER_MESSAGE_BUFFER(Error); };
+	config.logger.debug = [](std::string m, ...)->void { };
+	config.logger.info = [](std::string m, ...)->void { };
+	config.logger.error = [](std::string m, ...)->void { };
 	config.logger.fatal = [](std::string m, ...)->void { LOGGER_MESSAGE_BUFFER(Fatal); };
 	return Il2CppResolver->Setup(config);
+}
+
+void Unload()
+{
+	logger.LogInfo("Perfect unloaded!");
+	Il2CppResolver->Destroy();
+	free(Il2CppResolver);
+	FreeLibraryAndExitThread(module, 0);
 }
 
 void Run()
@@ -30,6 +38,7 @@ void Run()
 			return;
 		logger.LogDebug("Il2CppResolverInit success!");
 		RunResolver();
+		logger.~NaLogger();
 	}
 	catch (const std::exception& e)
 	{

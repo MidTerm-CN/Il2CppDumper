@@ -9,6 +9,8 @@
 #define __NARESOLVER_ONLY_API
 #include <NaLibrary/NaResolver/NaResolver.h>
 
+void Unload();
+
 #include <NaLibrary/NaLogger/NaLogger.h>
 #include "Config/Logger.h"
 
@@ -17,5 +19,8 @@ inline NaLogger logger = NaLogger(
 );
 
 #include "Core/Core.h"
+
+inline HMODULE module;
+
 bool Il2CppResolverInit();
 void Run();

@@ -82,6 +82,8 @@ namespace Config
 			{
 				self->LogDebug("Destroy...");
 				FreeConsole();
+				if (logFile.is_open()) logFile.close();
+				Unload();
 			}
 		};
 	}

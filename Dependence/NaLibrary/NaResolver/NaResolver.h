@@ -32,7 +32,7 @@ typedef wchar_t Il2CppChar;
 class Il2CppManager
 {
 public:
-	HMODULE assemblyModule;
+	HMODULE assemblyModule = 0;
 	std::unordered_map<std::string, void *> il2cppMethodMap =
 	{
 		{"il2cpp_domain_get", nullptr},
@@ -325,10 +325,10 @@ public:
 
 		struct LoggerConfig
 		{
-			void (*fatal)(std::string, ...);
-			void (*info)(std::string, ...);
-			void (*debug)(std::string, ...);
-			void (*error)(std::string, ...);
+			void (*fatal)(std::string, ...) = 0;
+			void (*info)(std::string, ...) = 0;
+			void (*debug)(std::string, ...) = 0;
+			void (*error)(std::string, ...) = 0;
 		} logger;
 	};
 	Il2CppManager il2CppManager;
