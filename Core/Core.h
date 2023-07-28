@@ -20,6 +20,8 @@ inline std::unordered_map<std::string, std::string> csTypeMap
 	{ "System::String",					"Il2CppString*" },
 	{ "System::Object",					"Il2CppObject*" },
 	{ "System::Void",					"void" },
+	{ "System::IntPtr",					"intptr_t"},
+	{ "System::Type",					"Il2CppType*"},
 	{ "System::MulticastDelegate",		"Il2CppMulticastDelegate" },
 	{ "System::Delegate",				"Il2CppDelegate" },
 };
@@ -47,8 +49,9 @@ inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
-	"UnityEngine.CoreModule",
-	"Assembly-CSharp",
+	//"UnityEngine.CoreModule",
+	//"Assembly-CSharp",
+	//"mscorlib",
 };
 
 struct FieldStructure
@@ -888,7 +891,7 @@ inline std::string GenerateEnumKlassStructure(KlassStructure klass)
 
 	result += "// Name: " + klass.fullName + "\n";
 	result += "// Flags: " + klass.flags + "\n";
-	result += "enum class" + klass.name + "\n";
+	result += "enum class " + klass.name + "\n";
 	result += "{\n";
 	for (auto& item : klass.staticFields)
 	{
