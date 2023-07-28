@@ -1,7 +1,11 @@
 //**************************************//
-// Hi NaResolver						//
+// Hi NaResolver			//
 // Author: MidTerm                   	//
+<<<<<<< HEAD
 // Version: v1.6.3	                    //
+=======
+// Version: v1.6.2	                //
+>>>>>>> a5f656b064a82934e7f078622961f31c7806f1f1
 // License: MIT                         //
 //**************************************//
 
@@ -365,7 +369,11 @@ inline NaResolver* Il2CppResolver = new NaResolver();
 NaResolver::NaResolver()
 {
 	domain = nullptr;
+<<<<<<< HEAD
 	assemblies = std::unordered_map<std::string, Il2CppAssembly*>();
+=======
+	assemblies = std::unordered_map<std::string, const Il2CppAssembly*>();
+>>>>>>> a5f656b064a82934e7f078622961f31c7806f1f1
 	classes = std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, Il2CppClass*>>>();
 }
 
