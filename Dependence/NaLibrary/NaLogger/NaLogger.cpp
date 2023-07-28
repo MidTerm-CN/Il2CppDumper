@@ -2,14 +2,14 @@
 #include <chrono>
 #include <cstdarg>
 
-std::string GetFormat(const char* format, va_list args)
+std::string GetFormat(const char *format, va_list args)
 {
 	char buffer[0x1024];
 	vsprintf_s(buffer, format, args);
 	return buffer;
 }
 
-NaLogger::NaLogger(NaLoggerLevel level, std::string name, NaLoggerCallbacks* callbacks)
+NaLogger::NaLogger(NaLoggerLevel level, std::string name, NaLoggerCallbacks *callbacks)
 {
 	this->level = level;
 	this->name = name;
@@ -19,7 +19,7 @@ NaLogger::NaLogger(NaLoggerLevel level, std::string name, NaLoggerCallbacks* cal
 		this->callbacks->OnCreate(this);
 }
 
-NaLogger::NaLogger(NaLoggerLevel level, NaLoggerCallbacks* callbacks)
+NaLogger::NaLogger(NaLoggerLevel level, NaLoggerCallbacks *callbacks)
 {
 	this->level = level;
 	this->name = "[NaLogger]";
@@ -92,4 +92,3 @@ void NaLogger::LogDebug(std::string message, ...)
 	this->Log(NaLogItemLevel_Debug, GetFormat(message.c_str(), args));
 	va_end(args);
 }
-
