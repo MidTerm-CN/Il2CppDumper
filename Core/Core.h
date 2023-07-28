@@ -662,6 +662,16 @@ inline std::vector<std::string> GetNamespaceList(const std::string& nameSpace)
 	return result;
 }
 
+inline std::string Format(std::string input, ...)
+{
+	va_list args;
+	va_start(args, input);
+	char buffer[1024];
+	vsprintf_s(buffer, input.c_str(), args);
+	va_end(args);
+	return std::string(buffer);
+}
+
 inline std::string GenerateClassKlassStructure(KlassStructure klass)
 {
 	std::string result = "";
@@ -762,7 +772,7 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 		for (auto& item : klass.staticMethods)
 		{
 			result += "\t// Flags: " + item.flags + "\n";
-			result += "\t// Addresss: " + std::to_string((uintptr_t)(*(void**)item.method)) + "\n";
+			result += "\t// Addresss: " + Format("%p", (uintptr_t)(*(void**)item.method)) + "\n";
 			if (!item.operatorMethod)
 			{
 				result += "\tstatic " + item.returnType + " " + item.name + "(";
@@ -864,7 +874,7 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 			if (item.name == "BeginInvoke" || item.name == "EndInvoke")
 				continue;
 			result += "\t// Flags: " + item.flags + "\n";
-			result += "\t// Addresss: " + std::to_string((uintptr_t)(*(void**)item.method)) + "\n";
+			result += "\t// Addresss: " + Format("%p", (uintptr_t)(*(void**)item.method)) + "\n";
 			result += "\t" + item.returnType + " " + item.name + "(";
 			for (auto& param : item.parameters)
 			{
