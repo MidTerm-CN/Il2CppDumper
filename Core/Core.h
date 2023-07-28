@@ -22,8 +22,10 @@ inline std::unordered_map<std::string, std::string> csTypeMap
 	{ "System::Void",					"void" },
 	{ "System::IntPtr",					"intptr_t"},
 	{ "System::Type",					"Il2CppType*"},
-	{ "System::MulticastDelegate",		"Il2CppMulticastDelegate" },
-	{ "System::Delegate",				"Il2CppDelegate" },
+	{ "System::MulticastDelegate",		"Il2CppMulticastDelegate*" },
+	{ "System::Delegate",				"Il2CppDelegate*" },
+	{ "System::Func",					"Il2CppMulticastDelegate*" },
+	{ "System::Action",					"Il2CppMulticastDelegate*" },
 };
 
 const std::unordered_map<std::string, std::string> csOperatorMap
@@ -44,14 +46,13 @@ struct PreAnalysisKlass
 
 inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-
+	//{ "mscorlib" , "System", "Exception"},
 };
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
+	"Assembly-CSharp",
 	//"UnityEngine.CoreModule",
-	//"Assembly-CSharp",
-	//"mscorlib",
 };
 
 struct FieldStructure
@@ -167,6 +168,7 @@ inline bool ClassIsIllegality(const std::string& name)
 		{ "(<.*>d__\\d+)" },			// 协程类
 		{ "<>c__DisplayClass(.*)" },	// 匿名类
 		{ "<>c" },						// 匿名类
+		{ "(<.*>e__.*)" },						// 匿名类
 	};
 	for (const auto& item : ilegalityRegex)
 	{
@@ -294,6 +296,7 @@ inline FieldStructure AnalysisField(FieldInfo* field)
 inline MethodStructure AnalysisMethod(const MethodInfo* method)
 {
 	MethodStructure methodStructure;
+	methodStructure.method = (MethodInfo*)method;
 	methodStructure.name = ApiManager.GetMethodName(method);
 	methodStructure.flags = GetMethodFlag(ApiManager.GetMethodFlags(method, NULL));
 	methodStructure.signature = Signature::Method::Create(method, ApiManager);
@@ -330,7 +333,7 @@ inline KlassStructure AnalysisKlass(Il2CppClass* klass)
 		klassStructure.illegality = true;
 		return klassStructure;
 	}
-	klassStructure.klass.name = klassStructure.name;
+	klassStructure.klass.klass = klass;
 	klassStructure.klass.name = klassStructure.name;
 	klassStructure.klass.nameSpace = ApiManager.GetClassNamespace(klass);
 	klassStructure.klass.assemblyName = GetKlassAssembly(klass);
@@ -559,6 +562,16 @@ inline std::vector<std::string> GetGenericTypeParameterCount(const std::string& 
 
 inline void GenericTypeDispose(std::string& type)
 {
+	if (type.find("Action") != std::string::npos || type.find("Func") != std::string::npos)
+	{
+		if (csTypeMap.find(type) != csTypeMap.end())
+		{
+			type = csTypeMap.at(type);
+			return;
+		}
+		type = "Il2CppMulticastDelegate*";
+		return;
+	}
 	std::vector<std::string> genericParameters = GetGenericTypeParameterCount(type);
 	for (auto& item : genericParameters)
 	{
@@ -749,6 +762,7 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 		for (auto& item : klass.staticMethods)
 		{
 			result += "\t// Flags: " + item.flags + "\n";
+			result += "\t// Addresss: " + std::to_string((uintptr_t)(*(void**)item.method)) + "\n";
 			if (!item.operatorMethod)
 			{
 				result += "\tstatic " + item.returnType + " " + item.name + "(";
@@ -782,10 +796,10 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 						result += "\t\tMETHOD(" + item.returnType + ", (";
 						for (auto& param : item.parameters)
 						{
-							result += param.type + ", ";
+							result += param.type + "*, ";
 						}
 						result += "MethodInfo*), \"" + item.signature + "\");\n";
-						result += "\t\treturn function(this, nullptr)\n";
+						result += "\t\treturn function(this, nullptr);\n";
 						result += "\t}\n\n";
 					}
 					else
@@ -797,12 +811,12 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 							result += param.type + ", ";
 						}
 						result += "MethodInfo*), \"" + item.signature + "\");\n";
-						result += "\t\treturn function(";
+						result += "\t\tfunction(";
 						for (auto& param : item.parameters)
 						{
 							result += param.name + ", ";
 						}
-						result += "nullptr)\n";
+						result += "nullptr);\n";
 						result += "\t}\n\n";
 					}
 				}
@@ -815,7 +829,7 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 						result += param.type + ", ";
 					}
 					result += "MethodInfo*), \"" + item.signature + "\");\n";
-					result += "\t\treturn function(this, nullptr)\n";
+					result += "\t\function(this, nullptr);\n";
 					result += "\t}\n\n";
 				}
 				else
@@ -847,7 +861,10 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	{
 		for (auto& item : klass.methods)
 		{
+			if (item.name == "BeginInvoke" || item.name == "EndInvoke")
+				continue;
 			result += "\t// Flags: " + item.flags + "\n";
+			result += "\t// Addresss: " + std::to_string((uintptr_t)(*(void**)item.method)) + "\n";
 			result += "\t" + item.returnType + " " + item.name + "(";
 			for (auto& param : item.parameters)
 			{
@@ -1095,53 +1112,6 @@ inline void RunResolver()
 				if (std::find(assemblyNames.begin(), assemblyNames.end(), klass.klass.assemblyName) == assemblyNames.end())
 					assemblyNames.push_back(klass.klass.assemblyName);
 			}
-		}
-		for (const auto& assembly : assemblyNames)
-		{
-			std::filesystem::path assemblyPath = path / assembly;
-			std::filesystem::path assemblyHeaderPath = assemblyPath / (assembly + "AdvanceDeclaration.h");
-			if (std::filesystem::exists(assemblyHeaderPath)) std::filesystem::remove(assemblyHeaderPath);
-			std::ofstream file = std::ofstream(assemblyHeaderPath, std::ios::out);
-			file << "#pragma once\n\n";
-			for (const auto& klass : klassStructures)
-			{
-				if (klass.klass.assemblyName == assembly)
-				{
-					std::vector<std::string> namespaces = GetNamespaceList(klass.klass.nameSpace);
-					if (!klass.klass.nameSpace.empty())
-					{
-						for (auto& item : namespaces)
-							file << "namespace " + item + " {";
-					}
-					file << "class " << klass.klass.name << ";";
-					if (!klass.klass.nameSpace.empty())
-					{
-						for (auto& item : namespaces)
-							file << "}";
-					}
-					file << "\n";
-				}
-			}
-			file.close();
-		}
-		for (const auto& assembly : assemblyNames)
-		{
-			std::filesystem::path assemblyPath = path / assembly;
-			std::filesystem::path assemblyHeaderPath = assemblyPath / (assembly + "Include.h");
-			if (std::filesystem::exists(assemblyHeaderPath)) std::filesystem::remove(assemblyHeaderPath);
-			std::ofstream file = std::ofstream(assemblyHeaderPath, std::ios::out);
-			file << "#pragma once\n\n";
-			file << "#include \"" << assembly << "AdvanceDeclaration.h\"\n\n";
-			for (const auto& klass : klassStructures)
-			{
-				if (klass.klass.assemblyName == assembly)
-				{
-					std::string nameSpace = klass.klass.nameSpace.empty() ? "__NO_NAMESPACE__" : klass.klass.nameSpace;
-					std::string includePath = nameSpace + "/" + klass.klass.name + ".h";
-					file << "#include \"" << includePath << "\"\n";
-				}
-			}
-			file.close();
 		}
 	}
 	catch (const std::exception& e)
