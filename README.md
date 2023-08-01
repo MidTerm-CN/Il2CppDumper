@@ -17,7 +17,7 @@
 
 1. Open Core/Core.h
 2. Select your want to dump assemblies or classese   
-  <img src="Pic/Pic (4).png" alt=""/>
+    <img src="Pic/Pic (4).png" alt=""/>
 3. Compile the project
 4. Inject to game
 5. DONE
