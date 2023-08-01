@@ -1,17 +1,15 @@
 //**************************************//
-// Hi NaResolver			//
+// Hi NaResolver						//
 // Author: MidTerm                   	//
-<<<<<<< HEAD
-// Version: v1.6.3	                    //
-=======
-// Version: v1.6.2	                //
->>>>>>> a5f656b064a82934e7f078622961f31c7806f1f1
+// Version: v1.6.3						//
 // License: MIT                         //
 //**************************************//
 
 #if !_HAS_CXX17
 #error "The contents of NaResolver are available only with C++17 or later."
-#endif
+#else
+
+#undef GetClassName
 
 #pragma once
 #include <string>
@@ -196,22 +194,22 @@ namespace Signature
 			return Create(assembly->name, il2CppManager.GetClassNamespace(klass), il2CppManager.GetClassName(klass));
 		}
 
-		inline void Analysis(std::string signature, std::string* assembly, std::string* nameSpace, std::string* name)
+		inline void Analysis(std::string signature, std::string& assembly, std::string& nameSpace, std::string& name)
 		{
-			*assembly = signature.substr(signature.find("(") + 1, signature.find(")") - signature.find("(") - 1);
+			assembly = signature.substr(signature.find("(") + 1, signature.find(")") - signature.find("(") - 1);
 			signature = signature.substr(signature.find(")") + 1);
-			*nameSpace = signature.find(".") == std::string::npos ? "" : signature.substr(0, signature.rfind("."));
-			*name = signature.substr(signature.rfind(".") + 1);
+			nameSpace = signature.find(".") == std::string::npos ? "" : signature.substr(0, signature.rfind("."));
+			name = signature.substr(signature.rfind(".") + 1);
 		}
 	}
 
 	namespace Method
 	{
-		inline void Analysis(std::string signature, std::string* returnKlass, std::string* name, std::vector<std::string>* parameters)
+		inline void Analysis(std::string signature, std::string& returnKlass, std::string& name, std::vector<std::string>& parameters)
 		{
-			*returnKlass = signature.substr(0, signature.find(" "));
+			returnKlass = signature.substr(0, signature.find(" "));
 			signature = signature.substr(signature.find(" ") + 1);
-			*name = signature.substr(0, signature.find("("));
+			name = signature.substr(0, signature.find("("));
 			signature = signature.substr(signature.find("(") + 1);
 			if (signature.find(")") == std::string::npos)
 				return;
@@ -222,23 +220,23 @@ namespace Signature
 				int index = std::stoi(signature.substr(signature.find("MPA_") + 4));
 				for (int i = 0; i < index; i++)
 				{
-					parameters->push_back("AUTO");
+					parameters.push_back("AUTO");
 				}
 				return;
 			}
 
 			if (signature.size() <= 0)
 			{
-				parameters = new std::vector<std::string>();
+				parameters = std::vector<std::string>();
 				return;
 			}
 
 			while (signature.find(",") != std::string::npos)
 			{
-				parameters->push_back(signature.substr(0, signature.find(",")));
+				parameters.push_back(signature.substr(0, signature.find(",")));
 				signature = signature.substr(signature.find(",") + 2);
 			}
-			parameters->push_back(signature);
+			parameters.push_back(signature);
 		}
 
 		inline std::string Create(const MethodInfo* method, Il2CppManager il2CppManager)
@@ -284,7 +282,7 @@ namespace ConfusedTranslate
 	inline std::string RestoreKlass(std::string signature)
 	{
 		std::string assembly, nameSpace, name;
-		Signature::Class::Analysis(signature, &assembly, &nameSpace, &name);
+		Signature::Class::Analysis(signature, assembly, nameSpace, name);
 		for (auto& k : klass)
 		{
 			if (k.assembly.compare(assembly) == 0 && k.nameSpace.compare(nameSpace) == 0 && k.originalName.compare(name) == 0)
@@ -296,26 +294,13 @@ namespace ConfusedTranslate
 	inline std::string RestoreMethod(std::string klassSignature, std::string methodName)
 	{
 		std::string assembly, nameSpace, name;
-		Signature::Class::Analysis(klassSignature, &assembly, &nameSpace, &name);
+		Signature::Class::Analysis(klassSignature, assembly, nameSpace, name);
 		for (auto& m : method)
 		{
 			if (m.klass.assembly.compare(assembly) == 0 && m.klass.nameSpace.compare(nameSpace) == 0 && (m.klass.confusedName.compare(name) == 0 || m.klass.originalName.compare(name) == 0) && m.originalName.compare(methodName) == 0)
 				return m.confusedName;
 		}
 		return methodName;
-	}
-
-	inline std::string ConvertKlass(std::string signature)
-	{
-		std::string assembly, nameSpace, name;
-		Signature::Class::Analysis(signature, &assembly, &nameSpace, &name);
-		for (auto& k : klass)
-		{
-			bool allMatch = k.assembly.compare(assembly) == 0 && k.nameSpace.compare(nameSpace) == 0 && k.confusedName.compare(name) == 0;
-			if (allMatch)
-				return Signature::Class::Create(k.assembly, k.nameSpace, k.originalName);
-		}
-		return signature;
 	}
 }
 
@@ -369,11 +354,7 @@ inline NaResolver* Il2CppResolver = new NaResolver();
 NaResolver::NaResolver()
 {
 	domain = nullptr;
-<<<<<<< HEAD
-	assemblies = std::unordered_map<std::string, Il2CppAssembly*>();
-=======
 	assemblies = std::unordered_map<std::string, const Il2CppAssembly*>();
->>>>>>> a5f656b064a82934e7f078622961f31c7806f1f1
 	classes = std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, Il2CppClass*>>>();
 }
 
@@ -405,10 +386,13 @@ inline bool NaResolver::Setup(Config config)
 	}
 
 	if (config.attachedThread)
+	{
 		attachedThread = il2CppManager.AttachThread(domain);
+	}
 	if (config.disableGC)
+	{
 		il2CppManager.DisableGC();
-
+	}
 	LogInfo("[NaResolver] Setup success.");
 	return true;
 }
@@ -432,12 +416,15 @@ inline Il2CppClass* NaResolver::GetClassEx(std::string _assembly, std::string _n
 	std::string assembly = _assembly, nameSpace = _nameSpace, name = _name;
 	std::string signature = Signature::Class::Create(assembly, nameSpace, name);
 	if (nameSpace.compare("") == 0)
+	{
 		nameSpace = "__NO_NAMESPACE__";
+	}
 
 	if (ClassExistsInCache(assembly, nameSpace, name))
+	{
 		return classes[assembly][nameSpace][signature];
-
-	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), &assembly, &nameSpace, &name);
+	}
+	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), assembly, nameSpace, name);
 
 	const Il2CppAssembly* pAssembly = GetAssembly(assembly);
 	if (pAssembly == nullptr)
@@ -464,7 +451,9 @@ inline Il2CppClass* NaResolver::GetClassEx(std::string _assembly, std::string _n
 		classes.insert(std::make_pair(assembly, std::unordered_map<std::string, std::unordered_map<std::string, Il2CppClass*>>()));
 	}
 	if (nameSpace.compare("") == 0)
+	{
 		nameSpace = "__NO_NAMESPACE__";
+	}
 	if (classes[assembly].find(nameSpace) == classes[assembly].end())
 	{
 		classes[assembly].insert(std::make_pair(nameSpace, std::unordered_map<std::string, Il2CppClass*>()));
@@ -477,19 +466,20 @@ inline Il2CppClass* NaResolver::GetClassEx(std::string _assembly, std::string _n
 inline Il2CppClass* NaResolver::GetClass(std::string signature)
 {
 	std::string assembly, nameSpace, name;
-	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), &assembly, &nameSpace, &name);
+	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), assembly, nameSpace, name);
 	return GetClassEx(assembly, nameSpace, name);
 }
 
 inline Il2CppMethodPointer NaResolver::GetMethod(Il2CppClass* klass, std::string signature)
 {
 	if (klass == nullptr)
+	{
 		return nullptr;
-
+	}
 	std::string name = "";
 	std::string returnType = "";
 	std::vector<std::string> parameters = std::vector<std::string>();
-	Signature::Method::Analysis(signature, &returnType, &name, &parameters);
+	Signature::Method::Analysis(signature, returnType, name, parameters);
 	name = ConfusedTranslate::RestoreMethod(Signature::Class::Create(klass, il2CppManager), name);
 
 	void* iterator = nullptr;
@@ -515,8 +505,9 @@ inline Il2CppMethodPointer NaResolver::GetMethod(Il2CppClass* klass, std::string
 inline FieldInfo* NaResolver::GetField(Il2CppClass* klass, std::string name)
 {
 	if (klass == nullptr)
+	{
 		return nullptr;
-
+	}
 	void* iterator = nullptr;
 	FieldInfo* field = nullptr;
 
@@ -533,17 +524,21 @@ inline FieldInfo* NaResolver::GetField(Il2CppClass* klass, std::string name)
 inline const Il2CppType* NaResolver::GetType(std::string signature)
 {
 	std::string assembly, nameSpace, name;
-	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), &assembly, &nameSpace, &name);
+	Signature::Class::Analysis(ConfusedTranslate::RestoreKlass(signature), assembly, nameSpace, name);
 	Il2CppClass* klass = GetClassEx(assembly, nameSpace, name);
 	if (klass == nullptr)
+	{
 		return nullptr;
+	}
 	return il2CppManager.GetClassType(klass);
 }
 
 inline const Il2CppType* NaResolver::GetType(Il2CppClass* klass)
 {
 	if (klass == nullptr)
+	{
 		return nullptr;
+	}
 	return il2CppManager.GetClassType(klass);
 }
 
@@ -554,7 +549,7 @@ inline std::string NaResolver::GetStringByIl2Cpp(Il2CppString* string)
 		return std::string();
 	}
 	char16_t* chars = (char16_t*)il2CppManager.GetChars(string);
-	int len = il2CppManager.GetStringLength(string);
+	int len = (int)il2CppManager.GetStringLength(string);
 	int size = WideCharToMultiByte(CP_UTF8, 0, (LPCWCH)chars, len, NULL, 0, NULL, NULL);
 	char* buffer = new char[size + 1];
 	WideCharToMultiByte(CP_UTF8, 0, (LPCWCH)chars, len, buffer, size, NULL, NULL);
@@ -580,10 +575,14 @@ inline bool NaResolver::ClassExistsInCache(std::string assembly, std::string nam
 inline const Il2CppAssembly* NaResolver::GetAssembly(std::string name)
 {
 	if (assemblies.find(name) != assemblies.end())
+	{
 		return assemblies[name];
+	}
 	const Il2CppAssembly* assembly = il2CppManager.OpenDomainAssembly(domain, name.c_str());
 	if (!assembly)
+	{
 		return nullptr;
+	}
 	assemblies[name] = assembly;
 	return assembly;
 }
@@ -592,14 +591,20 @@ inline bool NaResolver::MethodVerifyParams(const MethodInfo* method, std::vector
 {
 	uint32_t methodParamCount = il2CppManager.GetMethodParamCount(method);
 	if (methodParamCount != parameters.size())
+	{
 		return false;
+	}
 	for (uint32_t j = 0; j < methodParamCount; j++)
 	{
 		if (parameters[j].compare("AUTO") == 0)
+		{
 			continue;
+		}
 		std::string parameterName = il2CppManager.GetTypeName(il2CppManager.GetMethodParam(method, j));
 		if (parameterName.compare(parameters[j]) != 0)
+		{
 			return false;
+		}
 	}
 	return true;
 }
@@ -617,3 +622,5 @@ inline bool NaResolver::MethodVerifyParams(const MethodInfo* method, std::vector
 	static klass get_##name() { return *reinterpret_cast<klass *>(*reinterpret_cast<uintptr_t *>((uintptr_t)ThisClass() + STATIC_AREA_OFFSET) + offset); } \
 	static void set_##name(klass value) { *reinterpret_cast<klass *>(*reinterpret_cast<uintptr_t *>((uintptr_t)ThisClass() + STATIC_AREA_OFFSET) + offset) = value; }
 #define METHOD(returnType, parameters, signature) static auto function = (returnType(*) parameters)(Il2CppResolver->GetMethod(ThisClass(), signature));
+
+#endif

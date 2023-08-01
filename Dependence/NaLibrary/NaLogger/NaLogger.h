@@ -35,15 +35,14 @@ enum NaLogItemLevel_
 
 struct NaLogItem
 {
-	std::string message;
-	NaLoggerTimestamp timestamp;
-	NaLogItemLevel level;
+	std::string message = std::string();
+	NaLoggerTimestamp timestamp = 0;
+	NaLogItemLevel level = 0;
 };
 
 struct NaLoggerCallbacks
 {
 	virtual void OnLog(class NaLogger* self, NaLogItem item) = 0;
-	virtual void OnClear(class NaLogger* self) = 0;
 	virtual void OnCreate(class NaLogger* self) = 0;
 	virtual void OnDestroy(class NaLogger* self) = 0;
 };
@@ -55,12 +54,10 @@ public:
 	NaLoggerLevel level;
 	NaLoggerTimestamp creationTime;
 	NaLoggerCallbacks* callbacks;
-	
+
 	NaLogger(NaLoggerLevel level, std::string name = "[NaLogger]", NaLoggerCallbacks* callbacks = {});
 	NaLogger(NaLoggerLevel level, NaLoggerCallbacks* callbacks = {});
 	~NaLogger();
-	
-	void Clear();
 
 	void Log(NaLogItemLevel level, std::string message);
 	void LogInfo(std::string message, ...);

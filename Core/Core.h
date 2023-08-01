@@ -46,13 +46,15 @@ struct PreAnalysisKlass
 
 inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 {
-	//{ "mscorlib" , "System", "Exception"},
+
 };
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
-	"Assembly-CSharp",
+	//"Assembly-CSharp",
 	//"UnityEngine.CoreModule",
+	//"UnityEngine.AssetBundleModule",
+	//"UnityEngine.AudioModule",
 };
 
 struct FieldStructure
@@ -916,6 +918,17 @@ inline std::string GenerateEnumKlassStructure(KlassStructure klass)
 {
 	std::string result = "";
 
+	std::vector<std::string> namespaceList = GetNamespaceList(klass.klass.nameSpace);
+
+	if (!klass.klass.nameSpace.empty())
+	{
+		for (auto& item : namespaceList)
+		{
+			result += "namespace ";
+			result += item;
+			result += "\n{\n";
+		}
+	}
 	result += "// Name: " + klass.fullName + "\n";
 	result += "// Flags: " + klass.flags + "\n";
 	result += "enum class " + klass.name + "\n";
@@ -925,7 +938,13 @@ inline std::string GenerateEnumKlassStructure(KlassStructure klass)
 		result += "\t" + item.name + " = " + item.value + ",\n";
 	}
 	result += "};\n";
-
+	if (!klass.klass.nameSpace.empty())
+	{
+		for (size_t i = 0; i < namespaceList.size(); i++)
+		{
+			result += "}\n";
+		}
+	}
 	return result;
 }
 
@@ -969,11 +988,14 @@ inline void RunResolver()
 				if (assembly == nullptr)
 					continue;
 				std::string assemblyName = GetAssemblyName(assembly);
-				std::vector<std::string>::iterator it = std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName);
-				if (it != preAnalysisAssemblyList.end())
+				for (auto& item : preAnalysisAssemblyList)
 				{
-					preAnalysisAssemblies.push_back(assembly);
-					preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), assemblyName));
+					if (item == assemblyName)
+					{
+						preAnalysisAssemblies.push_back(assembly);
+						preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), item));
+						break;
+					}
 				}
 			}
 			if (!preAnalysisAssemblyList.empty())

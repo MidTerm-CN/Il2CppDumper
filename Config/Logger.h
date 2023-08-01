@@ -55,11 +55,6 @@ namespace Config
 				SetConsoleTextColor();
 			}
 
-			void OnClear(NaLogger* self) override
-			{
-				self->LogDebug("Clear...");
-			}
-
 			void OnCreate(NaLogger* self) override
 			{
 				AllocConsole();
