@@ -27,7 +27,7 @@
     <ClCompile Include="Main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaLogger\NaLogger.cpp">
+    <ClCompile Include="Dependence\NaLibrary\NaLogger\NaLogger.cpp">
       <Filter>Dependence\NaLibrary\NaLogger</Filter>
     </ClCompile>
   </ItemGroup>
@@ -38,11 +38,11 @@
     <ClInclude Include="Config\Logger.h">
       <Filter>Config</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaLogger\NaLogger.h">
-      <Filter>Dependence\NaLibrary\NaLogger</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Core.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Dependence\NaLibrary\NaLogger\NaLogger.h">
+      <Filter>Dependence\NaLibrary\NaLogger</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
