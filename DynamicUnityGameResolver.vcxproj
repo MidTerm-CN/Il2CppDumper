@@ -144,6 +144,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\CppRuntimeLibrary\NaLibrary\NaLogger\NaLogger.h" />
     <ClInclude Include="Config\Logger.h" />
     <ClInclude Include="Core\Core.h" />
     <ClInclude Include="Dependence\NaLibrary\NaLogger\NaLogger.h" />
