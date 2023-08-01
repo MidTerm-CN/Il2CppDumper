@@ -51,10 +51,10 @@ inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
-	//"Assembly-CSharp",
-	//"UnityEngine.CoreModule",
-	//"UnityEngine.AssetBundleModule",
-	//"UnityEngine.AudioModule",
+	"Assembly-CSharp",
+	"UnityEngine.CoreModule",
+	"UnityEngine.AssetBundleModule",
+	"UnityEngine.AudioModule",
 };
 
 struct FieldStructure
@@ -993,7 +993,7 @@ inline void RunResolver()
 					if (item == assemblyName)
 					{
 						preAnalysisAssemblies.push_back(assembly);
-						preAnalysisAssemblyList.erase(std::find(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), item));
+						preAnalysisAssemblyList.erase(std::remove(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), item));
 						break;
 					}
 				}
