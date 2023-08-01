@@ -51,10 +51,10 @@ inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
-	"Assembly-CSharp",
+	//"Assembly-CSharp",
 	"UnityEngine.CoreModule",
-	"UnityEngine.AssetBundleModule",
-	"UnityEngine.AudioModule",
+	//"UnityEngine.AssetBundleModule",
+	//"UnityEngine.AudioModule",
 };
 
 struct FieldStructure
