@@ -18,14 +18,15 @@ inline std::unordered_map<std::string, std::string> csTypeMap
 	{ "System::Single",					"float" },
 	{ "System::Double",					"double" },
 	{ "System::String",					"Il2CppString*" },
-	{ "System::Object",					"Il2CppObject*" },
 	{ "System::Void",					"void" },
 	{ "System::IntPtr",					"intptr_t"},
-	{ "System::Type",					"Il2CppType*"},
-	{ "System::MulticastDelegate",		"Il2CppMulticastDelegate*" },
-	{ "System::Delegate",				"Il2CppDelegate*" },
-	{ "System::Func",					"Il2CppMulticastDelegate*" },
-	{ "System::Action",					"Il2CppMulticastDelegate*" },
+	{ "System::Type",					"Type*"},
+	{ "System::Delegate",				"void*" },
+	{ "System::Func",					"void*" },
+	{ "System::Action",					"void*" },
+	{ "System::Attribute",				"void*" },
+	{ "System::Object",					"void*" },
+	{ "System::MulticastDelegate",		"void*" },
 };
 
 const std::unordered_map<std::string, std::string> csOperatorMap
@@ -52,9 +53,10 @@ inline std::vector<PreAnalysisKlass> preAnalysisKlassList =
 inline std::vector<std::string> preAnalysisAssemblyList =
 {
 	//"Assembly-CSharp",
-	"UnityEngine.CoreModule",
+	//"UnityEngine.CoreModule",
+	//"UnityEngine.PhysicsModule",
+	//"UnityEngine.AnimationModule",
 	//"UnityEngine.AssetBundleModule",
-	//"UnityEngine.AudioModule",
 };
 
 struct FieldStructure
@@ -62,7 +64,9 @@ struct FieldStructure
 	std::string name;
 	std::string type;
 	std::string value;
-	std::string offset;
+
+	bool string;
+	bool backing;
 
 	std::vector<struct FieldStructure> elements;
 
@@ -81,7 +85,11 @@ struct MethodStructure
 {
 	std::string name;
 	std::string flags;
-	std::string signature;
+	struct Signature
+	{
+		std::string returnType;
+		std::vector<std::string> parameters;
+	} signature;
 	std::vector<MethodPrameterStructure> parameters;
 	std::string returnType;
 
@@ -108,12 +116,13 @@ struct KlassStructure
 	std::vector<std::string> genericParameters;
 
 	bool nested = false;
+	std::string parent;
 
 	bool enumKlass = false;
 	bool genericKlass = false;
 	bool realGenericKlass = false;
 	bool valueKlass = false;
-	
+
 	bool illegality = false;
 
 	bool processed = false;
@@ -167,10 +176,10 @@ inline bool ClassIsIllegality(const std::string& name)
 {
 	const std::vector<std::string> ilegalityRegex =
 	{
-		{ "(<.*>d__\\d+)" },			// –≠≥Ã¿‡
-		{ "<>c__DisplayClass(.*)" },	// ƒ‰√˚¿‡
-		{ "<>c" },						// ƒ‰√˚¿‡
-		{ "(<.*>e__.*)" },						// ƒ‰√˚¿‡
+		{ "(<.*>d__\\d+)" },			// ÂçèÁ®ãÁ±ª
+		{ "<>c__DisplayClass(.*)" },	// ÂåøÂêçÁ±ª
+		{ "<>c" },						// ÂåøÂêçÁ±ª
+		{ "(<.*>e__.*)" },						// ÂåøÂêçÁ±ª
 	};
 	for (const auto& item : ilegalityRegex)
 	{
@@ -191,7 +200,7 @@ inline bool IsBackingField(const std::string& name)
 inline void BackingFieldNameRationalization(std::string& name)
 {
 	std::regex regex("<(.*)>k__BackingField");
-	name = std::regex_replace(name, regex, "backingField__$1");
+	name = std::regex_replace(name, regex, "$1");
 }
 
 inline bool ClasseIsArray(const std::string& name)
@@ -289,7 +298,8 @@ inline FieldStructure AnalysisField(FieldInfo* field)
 	fieldStructure.name = ApiManager.GetFieldName(field);
 	const Il2CppType* type = ApiManager.GetFieldType(field);
 	fieldStructure.type = GetTypeFullName(type);
-	fieldStructure.offset = std::to_string(ApiManager.GetFieldOffset(field));
+	fieldStructure.string = fieldStructure.type == "System::String";
+	fieldStructure.backing = IsBackingField(fieldStructure.name);
 	Il2CppClass* klass = ApiManager.GetClassFromType(type);
 	fieldStructure.klass = klass;
 	return fieldStructure;
@@ -301,7 +311,6 @@ inline MethodStructure AnalysisMethod(const MethodInfo* method)
 	methodStructure.method = (MethodInfo*)method;
 	methodStructure.name = ApiManager.GetMethodName(method);
 	methodStructure.flags = GetMethodFlag(ApiManager.GetMethodFlags(method, NULL));
-	methodStructure.signature = Signature::Method::Create(method, ApiManager);
 	const Il2CppType* returnType = ApiManager.GetMethodReturnType(method);
 	methodStructure.returnType = GetTypeFullName(returnType);
 	methodStructure.returnKlass = ApiManager.GetClassFromType(returnType);
@@ -316,6 +325,7 @@ inline MethodStructure AnalysisMethod(const MethodInfo* method)
 		paramStructure.klass = klass;
 		methodStructure.parameters.push_back(paramStructure);
 	}
+	Signature::Method::Analysis(Signature::Method::Create(method, ApiManager), methodStructure.signature.returnType, methodStructure.name, methodStructure.signature.parameters);
 	return methodStructure;
 }
 
@@ -571,7 +581,7 @@ inline void GenericTypeDispose(std::string& type)
 			type = csTypeMap.at(type);
 			return;
 		}
-		type = "Il2CppMulticastDelegate*";
+		type = "void*";
 		return;
 	}
 	std::vector<std::string> genericParameters = GetGenericTypeParameterCount(type);
@@ -679,16 +689,16 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	std::string result = "";
 	std::vector<std::string> namespaceList = GetNamespaceList(klass.klass.nameSpace);
 
-	if (!klass.klass.nameSpace.empty())
-	{
-		for (auto& item : namespaceList)
-		{
-			result += "namespace ";
-			result += item;
-			result += "\n{\n";
-		}
-	}
-	
+	//if (!klass.klass.nameSpace.empty())
+	//{
+	//	for (auto& item : namespaceList)
+	//	{
+	//		result += "namespace ";
+	//		result += item;
+	//		result += "\n{\n";
+	//	}
+	//}
+
 	std::string inheritance = "";
 	for (auto& item : klass.inheritance)
 		inheritance += item + (item != klass.inheritance.back() ? std::string(" -> ") : "");
@@ -723,16 +733,23 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	result += "class " + klass.name;
 	if (!klass.baseKlass.empty())
 	{
-		std::string baseKlassString = " : public " + klass.baseKlass;
-		result += baseKlassString;
 		if (klass.valueKlass)
 		{
+			std::string baseKlassString = " : public " + klass.baseKlass;
+			result += baseKlassString;
 			if (baseKlassString.find("System::ValueType") != std::string::npos)
 			{
 				for (size_t i = 0; i < baseKlassString.size(); i++)
 				{
 					result.pop_back();
 				}
+			}
+		}
+		else
+		{
+			if (klass.baseKlass != "void")
+			{
+				result += " : public " + klass.baseKlass;
 			}
 		}
 	}
@@ -743,29 +760,77 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 		result += "public:\n";
 		for (auto& item : klass.nestedKlasses)
 		{
+			item.parent = klass.name;
 			std::string nestedKlass = GenerateKlassStructure(item);
 			result += nestedKlass;
 		}
 	}
 	result += "public:\n";
-	result += "\tCLASS(\"" + klass.klass.assemblyName + "\", \"" + klass.klass.nameSpace + "\", \"" + klass.klass.name + "\");\n\n";
+	if (!klass.nested)
+		result += "\tCLASS(" + klass.klass.assemblyName + ", " + klass.klass.nameSpace + ", " + klass.klass.name + ");\n\n";
+	else
+		result += "\tNESTED_CLASS(" + klass.parent + ", " + klass.klass.name + ");\n\n";
 
 	if (!klass.staticFields.empty())
 	{
 		for (auto& item : klass.staticFields)
 		{
-			result += "\tSTATIC_MEMBER(" + item.type + ", " + item.name + ", " + item.offset + ");\n";
+			result += "\tSTATIC_";
+			if (item.backing)
+				result += "BACKING_";
+			result += "FIELD(";
+			if (item.type == "Il2CppString*")
+			{
+				result += "std::string";
+			}
+			else
+			{
+				result += item.type;
+			}
+			result += ", " + item.name + ");\n";
 		}
 		result += "\n";
 	}
 	if (!klass.fields.empty())
 	{
-		result += "\tunion\n\t{\n";
 		for (auto& item : klass.fields)
 		{
-			result += "\t\tMEMBER(" + item.type + ", " + item.name + ", " + item.offset + ");\n";
+			if (klass.valueKlass)
+			{
+				result += "\t";
+				if (item.type == "Il2CppString*")
+				{
+					result += "void*";
+				}
+				else
+				{
+					result += item.type;
+				}
+				result += " " + item.name + ";";
+				if (item.type == "Il2CppString*")
+				{
+					result += " // String Field !";
+				}
+				result += "\n";
+			}
+			else
+			{
+				result += "\t";
+				if (item.backing)
+					result += "BACKING_";
+				result += "FIELD(";
+				if (item.type == "Il2CppString*")
+				{
+					result += "std::string";
+				}
+				else
+				{
+					result += item.type;
+				}
+				result += ", " + item.name + ");\n";
+			}
 		}
-		result += "\t};\n";
+		result += "\t\n";
 	}
 	if (!klass.staticFields.empty() || !klass.fields.empty())
 		result += "\n";
@@ -773,128 +838,284 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 	{
 		for (auto& item : klass.staticMethods)
 		{
+			if (item.operatorMethod || (*(void**)item.method) == nullptr)
+				continue;
+			bool flag = false;
+			for (auto p : item.signature.parameters)
+			{
+				if (p == "T" || p == "TKey" || p == "TValue" || p == "T[]")
+					flag = true;
+			}
+			if (flag)
+			{
+				continue;
+			}
 			result += "\t// Flags: " + item.flags + "\n";
-			result += "\t// Addresss: " + Format("%p", (uintptr_t)(*(void**)item.method)) + "\n";
+			result += "\t// Addresss: " + Format("%p", (*(void**)item.method)) + "\n";
 			if (!item.operatorMethod)
 			{
-				result += "\tstatic " + item.returnType + " " + item.name + "(";
-				for (auto& param : item.parameters)
+				result += "\tMETHOD(" + std::to_string(item.parameters.size()) + ", \"" + item.signature.returnType + "\", " + item.name;
+				for (auto& param : item.signature.parameters)
 				{
-					result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+					result += ", \"" + param + "\"";
 				}
-				result += ")\n\t{\n";
-				result += "\t\tMETHOD(" + item.returnType + ", (";
-				for (auto& param : item.parameters)
+				result += ");\n";
+				if (item.parameters.size() > 0)
 				{
-					result += param.type + ", ";
-				}
-				result += "MethodInfo*), \"" + item.signature + "\");\n";
-				result += "\t\treturn function(";
-				for (auto& param : item.parameters)
-				{
-					result += param.name + ", ";
-				}
-				result += "nullptr);\n";
-				result += "\t}\n\n";
-			}
-			else
-			{
-				std::transform(item.name.begin(), item.name.end(), item.name.begin(), ::tolower);
-				if (item.name == "implicit")
-				{
-					if (item.returnType != klass.fullName)
+					if (item.parameters[0].type == "Type*")
 					{
-						result += "\toperator " + item.returnType + "()\n\t{\n";
-						result += "\t\tMETHOD(" + item.returnType + ", (";
-						for (auto& param : item.parameters)
-						{
-							result += param.type + "*, ";
-						}
-						result += "MethodInfo*), \"" + item.signature + "\");\n";
-						result += "\t\treturn function(this, nullptr);\n";
-						result += "\t}\n\n";
+						result += "\ttemplate<typename T>\n";
+					}
+				}
+				result += "\tstatic " + (item.returnType == "Il2CppString*" ? "std::string" : item.returnType) + " " + item.name + "(";
+				for (auto& param : item.parameters)
+				{
+					if (param.type == "Il2CppString*")
+					{
+						result += "const std::string& " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+					}
+					else if (param.type == "Type*")
+					{
+						continue;
 					}
 					else
 					{
-						result += "\t" + klass.name + "(" + item.parameters[0].type + " " + item.parameters[0].name + ")\n\t{\n";
-						result += "\t\tMETHOD(" + klass.fullName + ", (";
-						for (auto& param : item.parameters)
-						{
-							result += param.type + ", ";
-						}
-						result += "MethodInfo*), \"" + item.signature + "\");\n";
-						result += "\t\tfunction(";
-						for (auto& param : item.parameters)
-						{
-							result += param.name + ", ";
-						}
-						result += "nullptr);\n";
-						result += "\t}\n\n";
+						result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
 					}
 				}
-				else if (csOperatorMap.find(item.name) != csOperatorMap.end())
+				result += ")\n\t{\n\t\t";
+
+				//result += "\t\tstatic ";
+				////result += item.returnType;
+
+				//result += "> invoker = METHOD_ADDRESS(\"" + item.signature.returnType + "\", \"" + item.name + "\"";
+				//for (auto& param : item.signature.parameters)
+				//{
+				//	result += ", \"" + param + "\"";
+				//}
+				//result += ");\n\t\t";
+				if (item.returnType != "void")
 				{
-					result += "\t" + item.returnType + " operator " + csOperatorMap.at(item.name) + "()\n\t{\n";
-					result += "\t\tMETHOD(" + klass.fullName + ", (";
-					for (auto& param : item.parameters)
-					{
-						result += param.type + ", ";
-					}
-					result += "MethodInfo*), \"" + item.signature + "\");\n";
-					result += "\t\function(this, nullptr);\n";
-					result += "\t}\n\n";
+					result += "return ";
+				}
+				if (item.returnType == "Il2CppString*")
+				{
+					result += "VmGeneralType::String(";
+				}
+				result += "Template::MethodInvoker<";
+				if (item.returnType == "Il2CppString*")
+				{
+					result += "void*";
 				}
 				else
 				{
-					result += "\tstatic " + item.returnType + " op_" + item.name + "(";
-					for (auto& param : item.parameters)
-					{
-						result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
-					}
-					result += ")\n\t{\n";
-					result += "\t\tMETHOD(" + item.returnType + ", (";
-					for (auto& param : item.parameters)
-					{
-						result += param.type + ", ";
-					}
-					result += "MethodInfo*), \"" + item.signature + "\");\n";
-					result += "\t\treturn function(";
-					for (auto& param : item.parameters)
-					{
-						result += param.name + ", ";
-					}
-					result += "nullptr);\n";
-					result += "\t}\n\n";
+					result += item.returnType;
 				}
+				for (auto& param : item.parameters)
+				{
+					if (param.type == "Il2CppString*" || param.type == "Type*")
+					{
+						result += ", void*";
+					}
+					else
+					{
+						result += ", " + param.type;
+					}
+				}
+				result += ">(__" + item.name + "_" + std::to_string(item.parameters.size()) + "_Method_Info__.GetMethodAddress())(";
+				for (auto& param : item.parameters)
+				{
+					if (param.type == "Il2CppString*")
+					{
+						result += "VmGeneralType::String(" + param.name + ")" + (param.name != item.parameters.back().name ? ", " : "");
+					}
+					else if (param.type == "Type*")
+					{
+						result += "T::ThisClass().type.GetObject().object, ";
+					}
+					else
+					{
+						result += param.name + (param.name != item.parameters.back().name ? ", " : "");
+					}
+				}
+				if (item.returnType == "Il2CppString*")
+				{
+					result += ")";
+				}
+				result += ");\n";
+
+				result += "\t}\n\n";
 			}
+			//else
+			//{
+			//	std::transform(item.name.begin(), item.name.end(), item.name.begin(), ::tolower);
+			//	if (item.name == "implicit")
+			//	{
+			//		if (item.returnType != klass.fullName)
+			//		{
+			//			result += "\toperator " + item.returnType + "()\n\t{\n";
+			//			result += "\t\tMETHOD(" + item.returnType + ", (";
+			//			for (auto& param : item.parameters)
+			//			{
+			//				result += param.type + "*, ";
+			//			}
+			//			result += "MethodInfo*), \"" + item.signature + "\");\n";
+			//			result += "\t\treturn function(this, nullptr);\n";
+			//			result += "\t}\n\n";
+			//		}
+			//		else
+			//		{
+			//			result += "\t" + klass.name + "(" + item.parameters[0].type + " " + item.parameters[0].name + ")\n\t{\n";
+			//			result += "\t\tMETHOD(" + klass.fullName + ", (";
+			//			for (auto& param : item.parameters)
+			//			{
+			//				result += param.type + ", ";
+			//			}
+			//			result += "MethodInfo*), \"" + item.signature + "\");\n";
+			//			result += "\t\tfunction(";
+			//			for (auto& param : item.parameters)
+			//			{
+			//				result += param.name + ", ";
+			//			}
+			//			result += "nullptr);\n";
+			//			result += "\t}\n\n";
+			//		}
+			//	}
+			//	else if (csOperatorMap.find(item.name) != csOperatorMap.end())
+			//	{
+			//		result += "\t" + item.returnType + " operator " + csOperatorMap.at(item.name) + "()\n\t{\n";
+			//		result += "\t\tMETHOD(" + klass.fullName + ", (";
+			//		for (auto& param : item.parameters)
+			//		{
+			//			result += param.type + ", ";
+			//		}
+			//		result += "MethodInfo*), \"" + item.signature + "\");\n";
+			//		result += "\t\function(this, nullptr);\n";
+			//		result += "\t}\n\n";
+			//	}
+			//	else
+			//	{
+			//		result += "\tstatic " + item.returnType + " op_" + item.name + "(";
+			//		for (auto& param : item.parameters)
+			//		{
+			//			result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+			//		}
+			//		result += ")\n\t{\n";
+			//		result += "\t\tMETHOD(" + item.returnType + ", (";
+			//		for (auto& param : item.parameters)
+			//		{
+			//			result += param.type + ", ";
+			//		}
+			//		result += "MethodInfo*), \"" + item.signature + "\");\n";
+			//		result += "\t\treturn function(";
+			//		for (auto& param : item.parameters)
+			//		{
+			//			result += param.name + ", ";
+			//		}
+			//		result += "nullptr);\n";
+			//		result += "\t}\n\n";
+			//	}
+			//}
 		}
 	}
 	if (!klass.methods.empty())
 	{
 		for (auto& item : klass.methods)
 		{
-			if (item.name == "BeginInvoke" || item.name == "EndInvoke")
+			bool flag = false;
+			for (auto p : item.signature.parameters)
+			{
+				if (p == "T" || p == "TKey" || p == "TValue" || p == "T[]")
+					flag = true;
+			}
+			if (flag)
+			{
 				continue;
+			}
 			result += "\t// Flags: " + item.flags + "\n";
-			result += "\t// Addresss: " + Format("%p", (uintptr_t)(*(void**)item.method)) + "\n";
-			result += "\t" + item.returnType + " " + item.name + "(";
+			result += "\t// Addresss: " + Format("%p", *(void**)item.method) + "\n";
+
+			result += "\tMETHOD(" + std::to_string(item.parameters.size()) + ", \"" + item.signature.returnType + "\", " + item.name;
+			for (auto& param : item.signature.parameters)
+			{
+				result += ", \"" + param + "\"";
+			}
+			result += ");\n";
+			if (item.parameters.size() > 0)
+			{
+				if (item.parameters[0].type == "Type*")
+				{
+					result += "\ttemplate<typename T>\n";
+				}
+			}
+			result += "\t" + (item.returnType == "Il2CppString*" ? "std::string" : item.returnType) + " " + item.name + "(";
 			for (auto& param : item.parameters)
 			{
-				result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+				if (param.type == "Il2CppString*")
+				{
+					result += "const std::string& " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+				}
+				else if (param.type == "Type*")
+				{
+					continue;
+				}
+				else
+				{
+					result += param.type + " " + param.name + (param.name != item.parameters.back().name ? ", " : "");
+				}
 			}
-			result += ")\n\t{\n";
-			result += "\t\tMETHOD(" + item.returnType + ", (" + klass.name + "*" + (item.parameters.empty() ? "" : ", ");
+			result += ")\n\t{\n\t\t";
+			if (item.returnType != "void")
+			{
+				result += "return ";
+			}
+			if (item.returnType == "Il2CppString*")
+			{
+				result += "VmGeneralType::String(";
+			}
+			result += "Template::MethodInvoker<";
+			if (item.returnType == "Il2CppString*")
+			{
+				result += "void*";
+			}
+			else
+			{
+				result += item.returnType;
+			}
+			result += ", " + klass.name + "*";
 			for (auto& param : item.parameters)
 			{
-				result += param.type + (param.name != item.parameters.back().name ? ", " : "");
+				if (param.type == "Il2CppString*" || param.type == "Type*")
+				{
+					result += ", void*";
+				}
+				else
+				{
+					result += ", " + param.type;
+				}
 			}
-			result += ", MethodInfo*), \"" + item.signature + "\");\n";
-			result += "\t\treturn function(this" + std::string(item.parameters.empty() ? "" : ", ");
+			result += ">(__" + item.name + "_" + std::to_string(item.parameters.size()) + "_Method_Info__.GetMethodAddress())(this";
 			for (auto& param : item.parameters)
 			{
-				result += param.name + (param.name != item.parameters.back().name ? ", " : "");
+				result += ", ";
+				if (param.type == "Il2CppString*")
+				{
+					result += "VmGeneralType::String(" + param.name + ")";
+				}
+				else if (param.type == "Type*")
+				{
+					result += "T::ThisClass().type.GetObject().object";
+				}
+				else
+				{
+					result += param.name;
+				}
 			}
-			result += ", nullptr);\n";
+			if (item.returnType == "Il2CppString*")
+			{
+				result += ")";
+			}
+			result += ");\n";
 			result += "\t}\n\n";
 		}
 	}
@@ -903,14 +1124,14 @@ inline std::string GenerateClassKlassStructure(KlassStructure klass)
 		result.pop_back();
 	}
 	result += "};\n\n";
-	
-	if (!klass.klass.nameSpace.empty())
-	{
-		for (size_t i = 0; i < namespaceList.size(); i++)
-		{
-			result += "}\n";
-		}
-	}
+
+	//if (!klass.klass.nameSpace.empty())
+	//{
+	//	for (size_t i = 0; i < namespaceList.size(); i++)
+	//	{
+	//		result += "}\n";
+	//	}
+	//}
 	return result;
 }
 
@@ -980,23 +1201,10 @@ inline void RunResolver()
 			std::vector<const Il2CppAssembly*> preAnalysisAssemblies;
 			for (int i = 0; i < assembliesSize; i++)
 			{
-				if (preAnalysisAssemblies.size() == preAnalysisAssemblyList.size())
-				{
-					break;
-				}
 				const Il2CppAssembly* assembly = assemblies[i];
 				if (assembly == nullptr)
 					continue;
-				std::string assemblyName = GetAssemblyName(assembly);
-				for (auto& item : preAnalysisAssemblyList)
-				{
-					if (item == assemblyName)
-					{
-						preAnalysisAssemblies.push_back(assembly);
-						preAnalysisAssemblyList.erase(std::remove(preAnalysisAssemblyList.begin(), preAnalysisAssemblyList.end(), item));
-						break;
-					}
-				}
+				preAnalysisAssemblies.push_back(assembly);
 			}
 			if (!preAnalysisAssemblyList.empty())
 			{
@@ -1096,10 +1304,10 @@ inline void RunResolver()
 			logger.LogInfo("BaseKlass: %s", klass.baseKlass.c_str());
 			logger.LogInfo("Fields:");
 			for (auto& field : klass.fields)
-				logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
+				logger.LogInfo("    %s %s", field.type.c_str(), field.name.c_str());
 			logger.LogInfo("StaticFields:");
 			for (auto& field : klass.staticFields)
-				logger.LogInfo("    %s %s %s", field.type.c_str(), field.name.c_str(), field.offset.c_str());
+				logger.LogInfo("    %s %s", field.type.c_str(), field.name.c_str());
 			logger.LogInfo("Methods:");
 			for (auto& method : klass.methods)
 			{
@@ -1109,7 +1317,7 @@ inline void RunResolver()
 					name += item.type + " " + item.name + (item.name != method.parameters.back().name ? std::string(", ") : "");
 				}
 				name += ")";
-				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), Signature::Method::Create(method.method, ApiManager).c_str());
 			}
 			logger.LogInfo("StaticMethods:");
 			for (auto& method : klass.staticMethods)
@@ -1118,7 +1326,7 @@ inline void RunResolver()
 				for (auto& item : method.parameters)
 					name += item.type + (item.type != method.parameters.back().type ? std::string(", ") : ")");
 				name += ")";
-				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), method.signature.c_str());
+				logger.LogInfo("    %s %s    [%s]", method.returnType.c_str(), name.c_str(), Signature::Method::Create(method.method, ApiManager).c_str());
 			}
 			logger.LogInfo("NestedKlasses:");
 			for (auto& nestedKlass : klass.nestedKlasses)
